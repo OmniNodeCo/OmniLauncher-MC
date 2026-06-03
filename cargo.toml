@@ -1,0 +1,39 @@
+[package]
+name = "omnilauncher-mc"
+version = "1.0.0"
+edition = "2021"
+authors = ["OmniNodeCo"]
+description = "A lightweight custom Minecraft launcher"
+repository = "https://github.com/OmniNodeCo/OmniLauncher-MC"
+license = "MIT"
+
+[dependencies]
+iced = { version = "0.12", features = ["svg", "image", "tokio"] }
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+dirs = "5"
+zip = "0.6"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures = "0.3"
+bytes = "1"
+open = "5"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
