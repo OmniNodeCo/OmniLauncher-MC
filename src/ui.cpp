@@ -44,15 +44,18 @@ enum {
 
 static const COLORREF BG_COLOR      = RGB(30,  30,  36);
 static const COLORREF BG_CONTROL    = RGB(50,  50,  60);
-static const COLORREF TEXT_COLOR    = RGB(220, 220, 230);
+static const COLORREF TEXT_COLOR    = RGB(230, 230, 235);
+static const COLORREF TEXT_DIM      = RGB(170, 170, 180);
 static const COLORREF ACCENT_COLOR  = RGB(76,  175, 80);
 static const COLORREF ACCENT_HOVER  = RGB(56,  142, 60);
+static const COLORREF BORDER_COLOR  = RGB(70,  70,  85);
 
 static HBRUSH  g_bgBrush      = nullptr;
 static HBRUSH  g_ctrlBrush    = nullptr;
 static HFONT   g_mainFont     = nullptr;
 static HFONT   g_titleFont    = nullptr;
 static HFONT   g_smallFont    = nullptr;
+static HFONT   g_btnFont      = nullptr;
 static UI*     g_ui           = nullptr;
 
 static std::wstring to_w(const std::string& s) {
@@ -80,125 +83,149 @@ static std::string get_edit_text(HWND h) {
     return from_w(buf);
 }
 
+static HFONT make_font(int size, int weight, const wchar_t* face) {
+    return CreateFontW(size, 0, 0, 0, weight, 0, 0, 0,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, face);
+}
+
 static void init_gdi_resources() {
     if (!g_bgBrush)   g_bgBrush   = CreateSolidBrush(BG_COLOR);
     if (!g_ctrlBrush) g_ctrlBrush = CreateSolidBrush(BG_CONTROL);
-    if (!g_mainFont)  g_mainFont  = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-    if (!g_titleFont) g_titleFont = CreateFontW(26, 0, 0, 0, FW_BOLD,   0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-    if (!g_smallFont) g_smallFont = CreateFontW(13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+    if (!g_mainFont)  g_mainFont  = make_font(16, FW_NORMAL, L"Segoe UI");
+    if (!g_titleFont) g_titleFont = make_font(28, FW_BOLD,   L"Segoe UI");
+    if (!g_smallFont) g_smallFont = make_font(13, FW_NORMAL, L"Segoe UI");
+    if (!g_btnFont)   g_btnFont   = make_font(22, FW_BOLD,   L"Segoe UI");
 }
 
 void UI::create_controls() {
     HWND h = (HWND)hwnd_;
-    const int W = 700;
+    const int W = 720;
 
-    int y = 16;
-    HWND hTitle = CreateWindowW(L"STATIC", L"\u2B21  OmniLauncher",
+    // Title bar
+    int y = 14;
+    HWND hTitle = CreateWindowW(L"STATIC", L"OMNILAUNCHER",
         WS_CHILD | WS_VISIBLE | SS_CENTER,
         0, y, W, 38, h, nullptr, nullptr, nullptr);
     SendMessageW(hTitle, WM_SETFONT, (WPARAM)g_titleFont, TRUE);
-    y += 52;
+    y += 50;
 
-    HWND hUL = CreateWindowW(L"STATIC", L"Username:",
-        WS_CHILD | WS_VISIBLE, 30, y + 3, 85, 20, h, nullptr, nullptr, nullptr);
+    // Subtitle
+    HWND hSub = CreateWindowW(L"STATIC", L"Minecraft Launcher by OmniNodeCo",
+        WS_CHILD | WS_VISIBLE | SS_CENTER,
+        0, y, W, 18, h, nullptr, nullptr, nullptr);
+    SendMessageW(hSub, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
+    y += 32;
+
+    // Username row
+    HWND hUL = CreateWindowW(L"STATIC", L"Username",
+        WS_CHILD | WS_VISIBLE, 40, y + 4, 80, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hUL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     username_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-        118, y, 200, 26, h, (HMENU)ID_USERNAME_EDIT, nullptr, nullptr);
+        130, y, 220, 28, h, (HMENU)ID_USERNAME_EDIT, nullptr, nullptr);
     SendMessageW((HWND)username_edit_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
     SendMessageW((HWND)username_edit_, EM_SETLIMITTEXT, 16, 0);
 
     offline_check_ = CreateWindowW(L"BUTTON", L"Offline Mode",
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        335, y + 2, 130, 22, h, (HMENU)ID_OFFLINE_CHECK, nullptr, nullptr);
+        370, y + 4, 130, 22, h, (HMENU)ID_OFFLINE_CHECK, nullptr, nullptr);
     SendMessageW((HWND)offline_check_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
-    y += 38;
+    y += 42;
 
-    HWND hVL = CreateWindowW(L"STATIC", L"Version:",
-        WS_CHILD | WS_VISIBLE, 30, y + 3, 85, 20, h, nullptr, nullptr, nullptr);
+    // Version row
+    HWND hVL = CreateWindowW(L"STATIC", L"Version",
+        WS_CHILD | WS_VISIBLE, 40, y + 4, 80, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hVL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     version_combo_ = CreateWindowExW(0, L"COMBOBOX", L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
-        118, y, 200, 300, h, (HMENU)ID_VERSION_COMBO, nullptr, nullptr);
+        130, y, 220, 320, h, (HMENU)ID_VERSION_COMBO, nullptr, nullptr);
     SendMessageW((HWND)version_combo_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     snapshot_check_ = CreateWindowW(L"BUTTON", L"Snapshots",
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        335, y + 2, 100, 22, h, (HMENU)ID_SNAPSHOT_CHECK, nullptr, nullptr);
+        370, y + 4, 100, 22, h, (HMENU)ID_SNAPSHOT_CHECK, nullptr, nullptr);
     SendMessageW((HWND)snapshot_check_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
-    HWND hRef = CreateWindowW(L"BUTTON", L"\u21BB",
+    HWND hRef = CreateWindowW(L"BUTTON", L"Refresh",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        445, y, 32, 26, h, (HMENU)ID_REFRESH_BTN, nullptr, nullptr);
+        480, y, 80, 28, h, (HMENU)ID_REFRESH_BTN, nullptr, nullptr);
     SendMessageW(hRef, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
-    y += 38;
+    y += 42;
 
-    HWND hRL = CreateWindowW(L"STATIC", L"RAM:",
-        WS_CHILD | WS_VISIBLE, 30, y + 5, 50, 20, h, nullptr, nullptr, nullptr);
+    // RAM row
+    HWND hRL = CreateWindowW(L"STATIC", L"RAM",
+        WS_CHILD | WS_VISIBLE, 40, y + 6, 80, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hRL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     ram_slider_ = CreateWindowW(TRACKBAR_CLASSW, L"",
         WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS | TBS_HORZ,
-        83, y, 240, 30, h, (HMENU)ID_RAM_SLIDER, nullptr, nullptr);
+        125, y, 280, 30, h, (HMENU)ID_RAM_SLIDER, nullptr, nullptr);
     SendMessageW((HWND)ram_slider_, TBM_SETRANGE, TRUE, MAKELPARAM(1, 16));
     SendMessageW((HWND)ram_slider_, TBM_SETPOS, TRUE, 2);
     SendMessageW((HWND)ram_slider_, TBM_SETTICFREQ, 1, 0);
 
     ram_label_ = CreateWindowW(L"STATIC", L"2 GB",
-        WS_CHILD | WS_VISIBLE, 332, y + 5, 60, 20, h, (HMENU)ID_RAM_LABEL, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 415, y + 6, 80, 20, h, (HMENU)ID_RAM_LABEL, nullptr, nullptr);
     SendMessageW((HWND)ram_label_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
-    y += 42;
+    y += 44;
 
-    HWND hJL = CreateWindowW(L"STATIC", L"Java:",
-        WS_CHILD | WS_VISIBLE, 30, y + 3, 50, 20, h, nullptr, nullptr, nullptr);
+    // Java row
+    HWND hJL = CreateWindowW(L"STATIC", L"Java",
+        WS_CHILD | WS_VISIBLE, 40, y + 4, 80, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hJL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     java_path_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-        83, y, 470, 26, h, (HMENU)ID_JAVA_EDIT, nullptr, nullptr);
+        125, y, 510, 28, h, (HMENU)ID_JAVA_EDIT, nullptr, nullptr);
     SendMessageW((HWND)java_path_edit_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
 
-    HWND hBrowse = CreateWindowW(L"BUTTON", L"...",
+    HWND hBrowse = CreateWindowW(L"BUTTON", L"Browse",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        562, y, 30, 26, h, (HMENU)ID_BROWSE_JAVA_BTN, nullptr, nullptr);
+        642, y, 50, 28, h, (HMENU)ID_BROWSE_JAVA_BTN, nullptr, nullptr);
     SendMessageW(hBrowse, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
-    y += 36;
+    y += 40;
 
-    HWND hJVL = CreateWindowW(L"STATIC", L"JVM Args:",
-        WS_CHILD | WS_VISIBLE, 30, y + 3, 70, 20, h, nullptr, nullptr, nullptr);
+    // JVM args row
+    HWND hJVL = CreateWindowW(L"STATIC", L"JVM Args",
+        WS_CHILD | WS_VISIBLE, 40, y + 4, 80, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hJVL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     jvm_args_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-        103, y, 490, 26, h, (HMENU)ID_JVM_EDIT, nullptr, nullptr);
+        125, y, 567, 28, h, (HMENU)ID_JVM_EDIT, nullptr, nullptr);
     SendMessageW((HWND)jvm_args_edit_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
-    y += 40;
+    y += 46;
 
+    // Progress bar
     progress_bar_ = CreateWindowW(PROGRESS_CLASSW, L"",
         WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        30, y, 640, 18, h, (HMENU)ID_PROGRESS, nullptr, nullptr);
+        40, y, 652, 14, h, (HMENU)ID_PROGRESS, nullptr, nullptr);
     SendMessageW((HWND)progress_bar_, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     SendMessageW((HWND)progress_bar_, PBM_SETBARCOLOR, 0, (LPARAM)ACCENT_COLOR);
     SendMessageW((HWND)progress_bar_, PBM_SETBKCOLOR, 0, (LPARAM)BG_CONTROL);
-    y += 26;
+    y += 22;
 
+    // Status label
     status_label_ = CreateWindowW(L"STATIC",
-        L"Ready \u2014 click \u21BB to load versions",
+        L"Ready - click Refresh to load versions",
         WS_CHILD | WS_VISIBLE | SS_CENTER,
-        30, y, 640, 18, h, (HMENU)ID_STATUS, nullptr, nullptr);
+        40, y, 652, 18, h, (HMENU)ID_STATUS, nullptr, nullptr);
     SendMessageW((HWND)status_label_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
     y += 30;
 
-    play_button_ = CreateWindowW(L"BUTTON", L"\u25B6  PLAY",
+    // PLAY button
+    play_button_ = CreateWindowW(L"BUTTON", L"PLAY",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_OWNERDRAW,
-        195, y, 310, 50, h, (HMENU)ID_PLAY_BTN, nullptr, nullptr);
-    y += 62;
+        196, y, 340, 54, h, (HMENU)ID_PLAY_BTN, nullptr, nullptr);
+    y += 66;
 
+    // Open folder button
     HWND hFolder = CreateWindowW(L"BUTTON", L"Open Data Folder",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        30, y, 140, 26, h, (HMENU)ID_FOLDER_BTN, nullptr, nullptr);
+        40, y, 150, 26, h, (HMENU)ID_FOLDER_BTN, nullptr, nullptr);
     SendMessageW(hFolder, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
 }
 
@@ -246,7 +273,7 @@ void UI::populate_versions() {
     for (size_t i = 0; i < versions_.size(); i++) {
         std::string label = versions_[i].id;
         if (versions_[i].type != "release")
-            label += " [" + versions_[i].type + "]";
+            label += "  [" + versions_[i].type + "]";
         SendMessageW((HWND)version_combo_, CB_ADDSTRING, 0,
             (LPARAM)to_w(label).c_str());
         if (versions_[i].id == Config::instance().selected_version)
@@ -341,6 +368,7 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         HDC hdc = (HDC)wp;
         SetTextColor(hdc, TEXT_COLOR);
         SetBkColor(hdc, BG_COLOR);
+        SetBkMode(hdc, TRANSPARENT);
         return (LRESULT)g_bgBrush;
     }
 
@@ -368,29 +396,38 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
     case WM_DRAWITEM: {
         auto* dis = (DRAWITEMSTRUCT*)lp;
         if (dis->CtlID == ID_PLAY_BTN) {
-            bool pressed = (dis->itemState & ODS_SELECTED) != 0;
-            COLORREF col = pressed ? ACCENT_HOVER : ACCENT_COLOR;
+            bool pressed  = (dis->itemState & ODS_SELECTED) != 0;
+            bool disabled = (dis->itemState & ODS_DISABLED) != 0;
+
+            COLORREF col;
+            if (disabled)     col = RGB(80, 90, 80);
+            else if (pressed) col = ACCENT_HOVER;
+            else              col = ACCENT_COLOR;
+
+            // Fill background
+            HBRUSH bgBr = CreateSolidBrush(BG_COLOR);
+            FillRect(dis->hDC, &dis->rcItem, bgBr);
+            DeleteObject(bgBr);
+
+            // Rounded button
             HBRUSH br = CreateSolidBrush(col);
             HRGN rgn = CreateRoundRectRgn(
                 dis->rcItem.left, dis->rcItem.top,
-                dis->rcItem.right, dis->rcItem.bottom, 14, 14);
+                dis->rcItem.right, dis->rcItem.bottom, 16, 16);
             FillRgn(dis->hDC, rgn, br);
             DeleteObject(rgn);
             DeleteObject(br);
 
             SetTextColor(dis->hDC, RGB(255, 255, 255));
             SetBkMode(dis->hDC, TRANSPARENT);
-            SelectObject(dis->hDC, g_titleFont);
+            HFONT oldFont = (HFONT)SelectObject(dis->hDC, g_btnFont);
 
             wchar_t text[64] = {};
             GetWindowTextW(dis->hwndItem, text, 64);
             DrawTextW(dis->hDC, text, -1, &dis->rcItem,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            if (dis->itemState & ODS_FOCUS) {
-                InflateRect(&dis->rcItem, -4, -4);
-                DrawFocusRect(dis->hDC, &dis->rcItem);
-            }
+            SelectObject(dis->hDC, oldFont);
             return TRUE;
         }
         break;
@@ -452,7 +489,7 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         if (wp) {
             g_ui->populate_versions();
             g_ui->update_status(
-                "Versions loaded \u2014 " +
+                "Versions loaded - " +
                 std::to_string(g_ui->versions_.size()) + " available", 0);
         } else {
             g_ui->update_status(
@@ -485,8 +522,8 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
 
     case WM_GETMINMAXINFO: {
         auto* mmi = (MINMAXINFO*)lp;
-        mmi->ptMinTrackSize = {720, 530};
-        mmi->ptMaxTrackSize = {720, 530};
+        mmi->ptMinTrackSize = {740, 560};
+        mmi->ptMaxTrackSize = {740, 560};
         break;
     }
 
@@ -522,19 +559,22 @@ int UI::run() {
 
     RECT desk = {};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &desk, 0);
-    int wx = (desk.right  - 720) / 2;
-    int wy = (desk.bottom - 530) / 2;
+    int wx = (desk.right  - 740) / 2;
+    int wy = (desk.bottom - 560) / 2;
 
     hwnd_ = CreateWindowExW(
         0,
         L"OmniLauncherWnd",
-        L"OmniLauncher \u2014 Minecraft Launcher",
+        L"OmniLauncher - Minecraft Launcher",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-        wx, wy, 720, 530,
+        wx, wy, 740, 560,
         nullptr, nullptr, wc.hInstance, nullptr);
 
+    // Enable immersive dark mode (Windows 10 1809+)
     BOOL dark = TRUE;
     DwmSetWindowAttribute((HWND)hwnd_, 20, &dark, sizeof(dark));
+    // Fallback attribute for older Win10 builds
+    DwmSetWindowAttribute((HWND)hwnd_, 19, &dark, sizeof(dark));
 
     create_controls();
     load_config_to_ui();
@@ -579,7 +619,7 @@ static void gtk_populate_versions() {
     for (size_t i = 0; i < g_versions.size(); i++) {
         std::string label = g_versions[i].id;
         if (g_versions[i].type != "release")
-            label += " [" + g_versions[i].type + "]";
+            label += "  [" + g_versions[i].type + "]";
         gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(g_version_cb), label.c_str());
         if (g_versions[i].id == Config::instance().selected_version)
             sel = (int)i;
@@ -659,13 +699,17 @@ int UI::run() {
     GtkCssProvider* css = gtk_css_provider_new();
     gtk_css_provider_load_from_data(css,
         "window,box{background-color:#1e1e24}"
-        "label{color:#dcdce6}"
-        "entry{background:#32323c;color:#dcdce6;border:1px solid #3c3c48}"
-        "combobox button{background:#32323c;color:#dcdce6}"
-        "button{background:#4CAF50;color:#fff;border-radius:6px;padding:6px 14px}"
+        "label{color:#e6e6eb;font-size:12pt}"
+        "entry{background:#32323c;color:#e6e6eb;border:1px solid #46465a;"
+            "border-radius:4px;padding:6px}"
+        "combobox button{background:#32323c;color:#e6e6eb;border-radius:4px}"
+        "button{background:#4CAF50;color:#fff;border-radius:6px;"
+            "padding:8px 16px;font-weight:bold}"
         "button:hover{background:#388E3C}"
-        "progressbar trough{background:#32323c}"
-        "progressbar progress{background:#4CAF50}",
+        "progressbar trough{background:#32323c;border-radius:4px;min-height:8px}"
+        "progressbar progress{background:#4CAF50;border-radius:4px}"
+        ".title{font-size:22pt;font-weight:bold;color:#fff}"
+        ".subtitle{font-size:10pt;color:#aaaab4}",
         -1, nullptr);
     gtk_style_context_add_provider_for_screen(
         gdk_screen_get_default(),
@@ -674,71 +718,74 @@ int UI::run() {
 
     g_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(g_window), "OmniLauncher - Minecraft Launcher");
-    gtk_window_set_default_size(GTK_WINDOW(g_window), 700, 520);
+    gtk_window_set_default_size(GTK_WINDOW(g_window), 720, 540);
     gtk_window_set_resizable(GTK_WINDOW(g_window), FALSE);
     g_signal_connect(g_window, "destroy", G_CALLBACK(gtk_main_quit), nullptr);
 
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_container_set_border_width(GTK_CONTAINER(vbox), 20);
+    gtk_container_set_border_width(GTK_CONTAINER(vbox), 24);
     gtk_container_add(GTK_CONTAINER(g_window), vbox);
 
-    GtkWidget* title = gtk_label_new(nullptr);
-    gtk_label_set_markup(GTK_LABEL(title),
-        "<span font='20' weight='bold'>\u2B21 OmniLauncher</span>");
-    gtk_box_pack_start(GTK_BOX(vbox), title, FALSE, FALSE, 4);
+    GtkWidget* title = gtk_label_new("OMNILAUNCHER");
+    gtk_style_context_add_class(gtk_widget_get_style_context(title), "title");
+    gtk_box_pack_start(GTK_BOX(vbox), title, FALSE, FALSE, 2);
 
-    GtkWidget* ur = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_box_pack_start(GTK_BOX(ur), gtk_label_new("Username:"), FALSE, FALSE, 0);
+    GtkWidget* subtitle = gtk_label_new("Minecraft Launcher by OmniNodeCo");
+    gtk_style_context_add_class(gtk_widget_get_style_context(subtitle), "subtitle");
+    gtk_box_pack_start(GTK_BOX(vbox), subtitle, FALSE, FALSE, 0);
+
+    GtkWidget* ur = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(ur), gtk_label_new("Username"), FALSE, FALSE, 0);
     g_username_e = gtk_entry_new();
     gtk_entry_set_max_length(GTK_ENTRY(g_username_e), 16);
     gtk_entry_set_text(GTK_ENTRY(g_username_e), Config::instance().username.c_str());
     gtk_box_pack_start(GTK_BOX(ur), g_username_e, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), ur, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), ur, FALSE, FALSE, 4);
 
-    GtkWidget* vr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_box_pack_start(GTK_BOX(vr), gtk_label_new("Version:"), FALSE, FALSE, 0);
+    GtkWidget* vr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(vr), gtk_label_new("Version"), FALSE, FALSE, 0);
     g_version_cb = gtk_combo_box_text_new();
     gtk_box_pack_start(GTK_BOX(vr), g_version_cb, TRUE, TRUE, 0);
     g_snapshot_chk = gtk_check_button_new_with_label("Snapshots");
     g_signal_connect(g_snapshot_chk, "toggled",
         G_CALLBACK(+[](GtkWidget*, gpointer) { gtk_populate_versions(); }), nullptr);
     gtk_box_pack_start(GTK_BOX(vr), g_snapshot_chk, FALSE, FALSE, 0);
-    GtkWidget* ref_btn = gtk_button_new_with_label("\u21BB");
+    GtkWidget* ref_btn = gtk_button_new_with_label("Refresh");
     g_signal_connect(ref_btn, "clicked", G_CALLBACK(on_refresh), nullptr);
     gtk_box_pack_start(GTK_BOX(vr), ref_btn, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), vr, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), vr, FALSE, FALSE, 4);
 
-    GtkWidget* rr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_box_pack_start(GTK_BOX(rr), gtk_label_new("RAM (GB):"), FALSE, FALSE, 0);
+    GtkWidget* rr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(rr), gtk_label_new("RAM (GB)"), FALSE, FALSE, 0);
     g_ram_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 1, 16, 1);
     gtk_range_set_value(GTK_RANGE(g_ram_scale), Config::instance().ram_mb / 1024);
     gtk_box_pack_start(GTK_BOX(rr), g_ram_scale, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), rr, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), rr, FALSE, FALSE, 4);
 
-    GtkWidget* jr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_box_pack_start(GTK_BOX(jr), gtk_label_new("Java:"), FALSE, FALSE, 0);
+    GtkWidget* jr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(jr), gtk_label_new("Java"), FALSE, FALSE, 0);
     g_java_e = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(g_java_e), Config::instance().java_path.c_str());
     gtk_entry_set_placeholder_text(GTK_ENTRY(g_java_e), "Auto-detect");
     gtk_box_pack_start(GTK_BOX(jr), g_java_e, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), jr, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), jr, FALSE, FALSE, 4);
 
-    GtkWidget* jvr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_box_pack_start(GTK_BOX(jvr), gtk_label_new("JVM Args:"), FALSE, FALSE, 0);
+    GtkWidget* jvr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(jvr), gtk_label_new("JVM Args"), FALSE, FALSE, 0);
     g_jvm_e = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(g_jvm_e), Config::instance().jvm_args.c_str());
     gtk_box_pack_start(GTK_BOX(jvr), g_jvm_e, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), jvr, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), jvr, FALSE, FALSE, 4);
 
     g_progress = gtk_progress_bar_new();
-    gtk_box_pack_start(GTK_BOX(vbox), g_progress, FALSE, FALSE, 4);
+    gtk_box_pack_start(GTK_BOX(vbox), g_progress, FALSE, FALSE, 6);
 
-    g_status_lbl = gtk_label_new("Ready \u2014 click \u21BB to load versions");
+    g_status_lbl = gtk_label_new("Ready - click Refresh to load versions");
     gtk_box_pack_start(GTK_BOX(vbox), g_status_lbl, FALSE, FALSE, 0);
 
-    GtkWidget* play = gtk_button_new_with_label("\u25B6  PLAY");
+    GtkWidget* play = gtk_button_new_with_label("PLAY");
     g_signal_connect(play, "clicked", G_CALLBACK(on_play), nullptr);
-    gtk_box_pack_start(GTK_BOX(vbox), play, FALSE, FALSE, 8);
+    gtk_box_pack_start(GTK_BOX(vbox), play, FALSE, FALSE, 10);
 
     gtk_widget_show_all(g_window);
     on_refresh(nullptr, nullptr);
