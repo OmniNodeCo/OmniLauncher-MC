@@ -2,11 +2,12 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <map>
 #include "json.h"
 
 struct VersionInfo {
     std::string id;
-    std::string type; // release, snapshot, old_beta, old_alpha
+    std::string type;
     std::string url;
     std::string release_time;
 };
@@ -22,10 +23,8 @@ class Launcher {
 public:
     bool fetch_version_manifest();
     std::vector<VersionInfo> get_versions(bool releases_only = true) const;
-    
     bool download_version(const std::string& version_id, LaunchProgressCallback progress = nullptr);
     bool launch_game(const std::string& version_id, LaunchProgressCallback progress = nullptr);
-
     std::string last_error() const { return error_; }
 
 private:

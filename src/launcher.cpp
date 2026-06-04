@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -68,7 +69,7 @@ std::string Launcher::get_os_name() {
 
 bool Launcher::is_library_allowed(const json::Value& lib) {
     if (!lib.has("rules")) return true;
-    
+
     bool allowed = false;
     for (auto& rule : lib["rules"].as_array()) {
         std::string action = rule["action"].as_string();
@@ -97,6 +98,7 @@ bool Launcher::download_client_jar(const json::Value& vj, LaunchProgressCallback
     if (fs::exists(jar_path)) return true;
 
     if (progress) progress({"Downloading client...", 0});
+
     return HttpClient::download(url, jar_path, [&](const DownloadProgress& dp) {
         if (progress && dp.total > 0) {
             progress({"Downloading client...", (int)(dp.current * 100 / dp.total)});
@@ -140,13 +142,11 @@ bool Launcher::download_assets(const json::Value& vj, LaunchProgressCallback pro
     std::string index_url = vj["assetIndex"]["url"].as_string();
     fs::path index_path = Config::instance().assets_dir() / "indexes" / (index_id + ".json");
 
-    // Download asset index
     if (!fs::exists(index_path)) {
         if (progress) progress({"Downloading asset index...", 0});
         HttpClient::download(index_url, index_path);
     }
 
-    // Parse and download objects
     std::ifstream f(index_path);
     std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     f.close();
@@ -168,7 +168,8 @@ bool Launcher::download_assets(const json::Value& vj, LaunchProgressCallback pro
 
             if (!fs::exists(dest)) {
                 if (progress && current % 50 == 0) {
-                    progress({"Assets: " + std::to_string(current) + "/" + std::to_string(total), current * 100 / total});
+                    progress({"Assets: " + std::to_string(current) + "/" + std::to_string(total),
+                              current * 100 / total});
                 }
                 std::string url = std::string(RESOURCES_URL) + prefix + "/" + hash;
                 HttpClient::download(url, dest);
@@ -181,7 +182,6 @@ bool Launcher::download_assets(const json::Value& vj, LaunchProgressCallback pro
 }
 
 bool Launcher::download_version(const std::string& version_id, LaunchProgressCallback progress) {
-    // Find version URL
     std::string version_url;
     for (auto& v : versions_) {
         if (v.id == version_id) {
@@ -194,7 +194,6 @@ bool Launcher::download_version(const std::string& version_id, LaunchProgressCal
         return false;
     }
 
-    // Download version JSON
     fs::path version_dir = Config::instance().versions_dir() / version_id;
     fs::path json_path = version_dir / (version_id + ".json");
 
@@ -204,11 +203,10 @@ bool Launcher::download_version(const std::string& version_id, LaunchProgressCal
         HttpClient::download(version_url, json_path);
     }
 
-    // Parse version JSON
     std::ifstream f(json_path);
     std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     f.close();
-    
+
     json::Value vj;
     try {
         vj = json::parse(content);
@@ -217,7 +215,6 @@ bool Launcher::download_version(const std::string& version_id, LaunchProgressCal
         return false;
     }
 
-    // Download everything
     if (!download_client_jar(vj, progress)) return false;
     if (!download_libraries(vj, progress)) return false;
     if (!download_assets(vj, progress)) return false;
@@ -248,7 +245,6 @@ std::string Launcher::build_classpath(const json::Value& vj) {
         }
     }
 
-    // Add client jar
     std::string id = vj["id"].as_string();
     fs::path client = Config::instance().versions_dir() / id / (id + ".jar");
     if (!cp.empty()) cp += sep;
@@ -259,7 +255,7 @@ std::string Launcher::build_classpath(const json::Value& vj) {
 
 std::string Launcher::resolve_main_class(const json::Value& vj) {
     if (vj.has("mainClass")) return vj["mainClass"].as_string();
-    return "net.minecraft.client.main.Minecraft";
+    return "net.minecraft.client.main.Main";
 }
 
 std::vector<std::string> Launcher::build_game_args(const json::Value& vj) {
@@ -270,48 +266,41 @@ std::vector<std::string> Launcher::build_game_args(const json::Value& vj) {
     std::string asset_index = vj.has("assetIndex") ? vj["assetIndex"]["id"].as_string() : id;
     std::string version_type = vj.has("type") ? vj["type"].as_string() : "release";
 
-    // Map of replacements
     std::map<std::string, std::string> vars = {
-        {"${auth_player_name}", cfg.username},
-        {"${version_name}", id},
-        {"${game_directory}", cfg.base_dir().string()},
-        {"${assets_root}", cfg.assets_dir().string()},
+        {"${auth_player_name}",  cfg.username},
+        {"${version_name}",      id},
+        {"${game_directory}",    cfg.base_dir().string()},
+        {"${assets_root}",       cfg.assets_dir().string()},
         {"${assets_index_name}", asset_index},
-        {"${auth_uuid}", cfg.uuid},
+        {"${auth_uuid}",         cfg.uuid},
         {"${auth_access_token}", cfg.access_token.empty() ? "0" : cfg.access_token},
-        {"${user_type}", "legacy"},
-        {"${version_type}", version_type},
-        {"${user_properties}", "{}"},
-        {"${resolution_width}", "854"},
+        {"${user_type}",         "legacy"},
+        {"${version_type}",      version_type},
+        {"${user_properties}",   "{}"},
+        {"${resolution_width}",  "854"},
         {"${resolution_height}", "480"},
-        {"${auth_session}", "token:" + (cfg.access_token.empty() ? "0" : cfg.access_token)},
-        {"${game_assets}", cfg.assets_dir().string()},
+        {"${auth_session}",      "token:" + (cfg.access_token.empty() ? "0" : cfg.access_token)},
+        {"${game_assets}",       cfg.assets_dir().string()},
     };
 
-    // Try new format (arguments.game)
+    auto replace_vars = [&](std::string s) {
+        for (auto& [k, v] : vars) {
+            size_t pos;
+            while ((pos = s.find(k)) != std::string::npos)
+                s.replace(pos, k.size(), v);
+        }
+        return s;
+    };
+
     if (vj.has("arguments") && vj["arguments"].has("game")) {
         for (auto& arg : vj["arguments"]["game"].as_array()) {
             if (arg.is_string()) {
-                std::string s = arg.as_string();
-                for (auto& [k, v] : vars) {
-                    size_t pos;
-                    while ((pos = s.find(k)) != std::string::npos) {
-                        s.replace(pos, k.size(), v);
-                    }
-                }
-                args.push_back(s);
+                args.push_back(replace_vars(arg.as_string()));
             }
+            // skip rule-based conditional args (objects) for simplicity
         }
-    }
-    // Old format (minecraftArguments)
-    else if (vj.has("minecraftArguments")) {
-        std::string mc_args = vj["minecraftArguments"].as_string();
-        for (auto& [k, v] : vars) {
-            size_t pos;
-            while ((pos = mc_args.find(k)) != std::string::npos) {
-                mc_args.replace(pos, k.size(), v);
-            }
-        }
+    } else if (vj.has("minecraftArguments")) {
+        std::string mc_args = replace_vars(vj["minecraftArguments"].as_string());
         std::istringstream iss(mc_args);
         std::string tok;
         while (iss >> tok) args.push_back(tok);
@@ -322,22 +311,12 @@ std::vector<std::string> Launcher::build_game_args(const json::Value& vj) {
 
 std::string Launcher::find_java() {
     auto& cfg = Config::instance();
-    if (!cfg.java_path.empty() && fs::exists(cfg.java_path)) {
+    if (!cfg.java_path.empty() && fs::exists(cfg.java_path))
         return cfg.java_path;
-    }
 
 #ifdef _WIN32
-    // Check common Java locations
-    std::vector<std::string> search = {
-        "C:\\Program Files\\Java",
-        "C:\\Program Files (x86)\\Java",
-        "C:\\Program Files\\Eclipse Adoptium",
-        "C:\\Program Files\\Microsoft\\jdk-17",
-        "C:\\Program Files\\Zulu",
-    };
-    
-    // Check JAVA_HOME
-    char* java_home = std::getenv("JAVA_HOME");
+    // Check JAVA_HOME first
+    const char* java_home = std::getenv("JAVA_HOME");
     if (java_home) {
         fs::path jp = fs::path(java_home) / "bin" / "javaw.exe";
         if (fs::exists(jp)) return jp.string();
@@ -345,18 +324,25 @@ std::string Launcher::find_java() {
         if (fs::exists(jp)) return jp.string();
     }
 
-    for (auto& dir : search) {
+    // Check common install paths
+    std::vector<std::string> search_dirs = {
+        "C:\\Program Files\\Java",
+        "C:\\Program Files\\Eclipse Adoptium",
+        "C:\\Program Files\\Microsoft",
+        "C:\\Program Files\\Zulu",
+        "C:\\Program Files\\BellSoft",
+        "C:\\Program Files (x86)\\Java",
+    };
+    for (auto& dir : search_dirs) {
         if (!fs::exists(dir)) continue;
         for (auto& entry : fs::directory_iterator(dir)) {
             fs::path javaw = entry.path() / "bin" / "javaw.exe";
             if (fs::exists(javaw)) return javaw.string();
         }
     }
-
-    // Try PATH
     return "javaw";
 #else
-    char* java_home = std::getenv("JAVA_HOME");
+    const char* java_home = std::getenv("JAVA_HOME");
     if (java_home) {
         fs::path jp = fs::path(java_home) / "bin" / "java";
         if (fs::exists(jp)) return jp.string();
@@ -386,22 +372,23 @@ bool Launcher::launch_game(const std::string& version_id, LaunchProgressCallback
 
     if (progress) progress({"Building launch command...", 50});
 
-    std::string java = find_java();
-    std::string classpath = build_classpath(vj);
+    std::string java       = find_java();
+    std::string classpath  = build_classpath(vj);
     std::string main_class = resolve_main_class(vj);
-    auto game_args = build_game_args(vj);
-    auto& cfg = Config::instance();
+    auto game_args         = build_game_args(vj);
+    auto& cfg              = Config::instance();
 
-    // Build command
+    // natives directory
+    fs::path natives_dir = Config::instance().versions_dir() / version_id / "natives";
+    fs::create_directories(natives_dir);
+
     std::vector<std::string> cmd;
     cmd.push_back(java);
-    
-    // JVM args
     cmd.push_back("-Xmx" + std::to_string(cfg.ram_mb) + "m");
     cmd.push_back("-Xms256m");
-    cmd.push_back("-Djava.library.path=" + (Config::instance().versions_dir() / version_id / "natives").string());
-    
-    // Custom JVM args
+    cmd.push_back("-Djava.library.path=" + natives_dir.string());
+    cmd.push_back("-Dfile.encoding=UTF-8");
+
     if (!cfg.jvm_args.empty()) {
         std::istringstream iss(cfg.jvm_args);
         std::string tok;
@@ -411,16 +398,16 @@ bool Launcher::launch_game(const std::string& version_id, LaunchProgressCallback
     cmd.push_back("-cp");
     cmd.push_back(classpath);
     cmd.push_back(main_class);
-
     for (auto& a : game_args) cmd.push_back(a);
 
     if (progress) progress({"Launching Minecraft " + version_id + "...", 90});
 
-    // Launch
 #ifdef _WIN32
+    // Build quoted command line
     std::string cmdline;
     for (size_t i = 0; i < cmd.size(); i++) {
         if (i > 0) cmdline += " ";
+        // Quote any argument containing spaces
         if (cmd[i].find(' ') != std::string::npos) {
             cmdline += "\"" + cmd[i] + "\"";
         } else {
@@ -428,24 +415,28 @@ bool Launcher::launch_game(const std::string& version_id, LaunchProgressCallback
         }
     }
 
+    // Convert to wide string
+    int wsz = MultiByteToWideChar(CP_UTF8, 0, cmdline.c_str(), -1, nullptr, 0);
+    std::vector<wchar_t> wcmd(wsz);
+    MultiByteToWideChar(CP_UTF8, 0, cmdline.c_str(), -1, wcmd.data(), wsz);
+
+    std::wstring wdir = Config::instance().base_dir().wstring();
+
     STARTUPINFOW si = {};
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {};
 
-    // Convert to wide
-    int sz = MultiByteToWideChar(CP_UTF8, 0, cmdline.c_str(), -1, nullptr, 0);
-    std::vector<wchar_t> wcmd(sz);
-    MultiByteToWideChar(CP_UTF8, 0, cmdline.c_str(), -1, wcmd.data(), sz);
-
-    std::wstring wdir = Config::instance().base_dir().wstring();
-
-    if (CreateProcessW(nullptr, wcmd.data(), nullptr, nullptr, FALSE, 0, nullptr, wdir.c_str(), &si, &pi)) {
+    if (CreateProcessW(nullptr, wcmd.data(), nullptr, nullptr,
+                       FALSE, CREATE_NO_WINDOW, nullptr,
+                       wdir.c_str(), &si, &pi)) {
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         if (progress) progress({"Game launched!", 100});
         return true;
     }
-    error_ = "Failed to launch process";
+
+    DWORD err = GetLastError();
+    error_ = "Failed to launch process (error " + std::to_string(err) + ")";
     return false;
 #else
     pid_t pid = fork();
@@ -453,14 +444,14 @@ bool Launcher::launch_game(const std::string& version_id, LaunchProgressCallback
         std::vector<char*> argv;
         for (auto& s : cmd) argv.push_back(const_cast<char*>(s.c_str()));
         argv.push_back(nullptr);
-        chdir(Config::instance().base_dir().c_str());
+        if (chdir(Config::instance().base_dir().c_str()) != 0) {}
         execvp(argv[0], argv.data());
         _exit(1);
     } else if (pid > 0) {
         if (progress) progress({"Game launched!", 100});
         return true;
     }
-    error_ = "Failed to fork";
+    error_ = "Failed to fork process";
     return false;
 #endif
 }
