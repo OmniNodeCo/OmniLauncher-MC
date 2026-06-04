@@ -6,12 +6,10 @@
 #include <vector>
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
-#include <commdlg.h>       // OPENFILENAMEW, GetOpenFileNameW
-#include <shellapi.h>      // ShellExecuteW
-#include <shlobj.h>        // SHGetKnownFolderPath
+#include <commdlg.h>
+#include <shellapi.h>
+#include <shlobj.h>
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <windowsx.h>
@@ -26,7 +24,6 @@
   "version='6.0.0.0' processorArchitecture='*' "\
   "publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-// ── Control IDs ────────────────────────────────────────────────────────────
 enum {
     ID_VERSION_COMBO  = 1001,
     ID_USERNAME_EDIT,
@@ -45,7 +42,6 @@ enum {
     ID_FOLDER_BTN,
 };
 
-// ── Palette ─────────────────────────────────────────────────────────────────
 static const COLORREF BG_COLOR      = RGB(30,  30,  36);
 static const COLORREF BG_CONTROL    = RGB(50,  50,  60);
 static const COLORREF TEXT_COLOR    = RGB(220, 220, 230);
@@ -57,9 +53,8 @@ static HBRUSH  g_ctrlBrush    = nullptr;
 static HFONT   g_mainFont     = nullptr;
 static HFONT   g_titleFont    = nullptr;
 static HFONT   g_smallFont    = nullptr;
-static UI*     g_ui            = nullptr;
+static UI*     g_ui           = nullptr;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 static std::wstring to_w(const std::string& s) {
     if (s.empty()) return {};
     int sz = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
@@ -88,132 +83,121 @@ static std::string get_edit_text(HWND h) {
 static void init_gdi_resources() {
     if (!g_bgBrush)   g_bgBrush   = CreateSolidBrush(BG_COLOR);
     if (!g_ctrlBrush) g_ctrlBrush = CreateSolidBrush(BG_CONTROL);
-    if (!g_mainFont)  g_mainFont  = CreateFontW(16,0,0,0,FW_NORMAL,0,0,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
-    if (!g_titleFont) g_titleFont = CreateFontW(26,0,0,0,FW_BOLD,  0,0,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
-    if (!g_smallFont) g_smallFont = CreateFontW(13,0,0,0,FW_NORMAL,0,0,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
+    if (!g_mainFont)  g_mainFont  = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+    if (!g_titleFont) g_titleFont = CreateFontW(26, 0, 0, 0, FW_BOLD,   0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+    if (!g_smallFont) g_smallFont = CreateFontW(13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
 }
 
-// ── UI methods ───────────────────────────────────────────────────────────────
 void UI::create_controls() {
     HWND h = (HWND)hwnd_;
     const int W = 700;
 
-    // Title label
     int y = 16;
     HWND hTitle = CreateWindowW(L"STATIC", L"\u2B21  OmniLauncher",
-        WS_CHILD|WS_VISIBLE|SS_CENTER,
+        WS_CHILD | WS_VISIBLE | SS_CENTER,
         0, y, W, 38, h, nullptr, nullptr, nullptr);
     SendMessageW(hTitle, WM_SETFONT, (WPARAM)g_titleFont, TRUE);
     y += 52;
 
-    // ── Row: Username ───────────────────────────────────────────────────
     HWND hUL = CreateWindowW(L"STATIC", L"Username:",
-        WS_CHILD|WS_VISIBLE, 30, y+3, 85, 20, h, nullptr, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 30, y + 3, 85, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hUL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     username_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
-        WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
         118, y, 200, 26, h, (HMENU)ID_USERNAME_EDIT, nullptr, nullptr);
     SendMessageW((HWND)username_edit_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
     SendMessageW((HWND)username_edit_, EM_SETLIMITTEXT, 16, 0);
 
     offline_check_ = CreateWindowW(L"BUTTON", L"Offline Mode",
-        WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
-        335, y+2, 130, 22, h, (HMENU)ID_OFFLINE_CHECK, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+        335, y + 2, 130, 22, h, (HMENU)ID_OFFLINE_CHECK, nullptr, nullptr);
     SendMessageW((HWND)offline_check_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
     y += 38;
 
-    // ── Row: Version ────────────────────────────────────────────────────
     HWND hVL = CreateWindowW(L"STATIC", L"Version:",
-        WS_CHILD|WS_VISIBLE, 30, y+3, 85, 20, h, nullptr, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 30, y + 3, 85, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hVL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     version_combo_ = CreateWindowExW(0, L"COMBOBOX", L"",
-        WS_CHILD|WS_VISIBLE|CBS_DROPDOWNLIST|WS_VSCROLL,
+        WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
         118, y, 200, 300, h, (HMENU)ID_VERSION_COMBO, nullptr, nullptr);
     SendMessageW((HWND)version_combo_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     snapshot_check_ = CreateWindowW(L"BUTTON", L"Snapshots",
-        WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
-        335, y+2, 100, 22, h, (HMENU)ID_SNAPSHOT_CHECK, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+        335, y + 2, 100, 22, h, (HMENU)ID_SNAPSHOT_CHECK, nullptr, nullptr);
     SendMessageW((HWND)snapshot_check_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     HWND hRef = CreateWindowW(L"BUTTON", L"\u21BB",
-        WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         445, y, 32, 26, h, (HMENU)ID_REFRESH_BTN, nullptr, nullptr);
     SendMessageW(hRef, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
     y += 38;
 
-    // ── Row: RAM ────────────────────────────────────────────────────────
     HWND hRL = CreateWindowW(L"STATIC", L"RAM:",
-        WS_CHILD|WS_VISIBLE, 30, y+5, 50, 20, h, nullptr, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 30, y + 5, 50, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hRL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     ram_slider_ = CreateWindowW(TRACKBAR_CLASSW, L"",
-        WS_CHILD|WS_VISIBLE|TBS_AUTOTICKS|TBS_HORZ,
+        WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS | TBS_HORZ,
         83, y, 240, 30, h, (HMENU)ID_RAM_SLIDER, nullptr, nullptr);
-    SendMessageW((HWND)ram_slider_, TBM_SETRANGE,  TRUE, MAKELPARAM(1, 16));
-    SendMessageW((HWND)ram_slider_, TBM_SETPOS,    TRUE, 2);
-    SendMessageW((HWND)ram_slider_, TBM_SETTICFREQ, 1,   0);
+    SendMessageW((HWND)ram_slider_, TBM_SETRANGE, TRUE, MAKELPARAM(1, 16));
+    SendMessageW((HWND)ram_slider_, TBM_SETPOS, TRUE, 2);
+    SendMessageW((HWND)ram_slider_, TBM_SETTICFREQ, 1, 0);
 
     ram_label_ = CreateWindowW(L"STATIC", L"2 GB",
-        WS_CHILD|WS_VISIBLE, 332, y+5, 60, 20, h, (HMENU)ID_RAM_LABEL, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 332, y + 5, 60, 20, h, (HMENU)ID_RAM_LABEL, nullptr, nullptr);
     SendMessageW((HWND)ram_label_, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
     y += 42;
 
-    // ── Row: Java path ──────────────────────────────────────────────────
     HWND hJL = CreateWindowW(L"STATIC", L"Java:",
-        WS_CHILD|WS_VISIBLE, 30, y+3, 50, 20, h, nullptr, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 30, y + 3, 50, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hJL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     java_path_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
-        WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
         83, y, 470, 26, h, (HMENU)ID_JAVA_EDIT, nullptr, nullptr);
     SendMessageW((HWND)java_path_edit_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
 
     HWND hBrowse = CreateWindowW(L"BUTTON", L"...",
-        WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         562, y, 30, 26, h, (HMENU)ID_BROWSE_JAVA_BTN, nullptr, nullptr);
     SendMessageW(hBrowse, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
     y += 36;
 
-    // ── Row: JVM args ───────────────────────────────────────────────────
     HWND hJVL = CreateWindowW(L"STATIC", L"JVM Args:",
-        WS_CHILD|WS_VISIBLE, 30, y+3, 70, 20, h, nullptr, nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE, 30, y + 3, 70, 20, h, nullptr, nullptr, nullptr);
     SendMessageW(hJVL, WM_SETFONT, (WPARAM)g_mainFont, TRUE);
 
     jvm_args_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
-        WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
         103, y, 490, 26, h, (HMENU)ID_JVM_EDIT, nullptr, nullptr);
     SendMessageW((HWND)jvm_args_edit_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
     y += 40;
 
-    // ── Progress bar ─────────────────────────────────────────────────────
     progress_bar_ = CreateWindowW(PROGRESS_CLASSW, L"",
-        WS_CHILD|WS_VISIBLE|PBS_SMOOTH,
+        WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
         30, y, 640, 18, h, (HMENU)ID_PROGRESS, nullptr, nullptr);
-    SendMessageW((HWND)progress_bar_, PBM_SETRANGE,    0, MAKELPARAM(0, 100));
+    SendMessageW((HWND)progress_bar_, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     SendMessageW((HWND)progress_bar_, PBM_SETBARCOLOR, 0, (LPARAM)ACCENT_COLOR);
-    SendMessageW((HWND)progress_bar_, PBM_SETBKCOLOR,  0, (LPARAM)BG_CONTROL);
+    SendMessageW((HWND)progress_bar_, PBM_SETBKCOLOR, 0, (LPARAM)BG_CONTROL);
     y += 26;
 
-    // ── Status label ─────────────────────────────────────────────────────
     status_label_ = CreateWindowW(L"STATIC",
         L"Ready \u2014 click \u21BB to load versions",
-        WS_CHILD|WS_VISIBLE|SS_CENTER,
+        WS_CHILD | WS_VISIBLE | SS_CENTER,
         30, y, 640, 18, h, (HMENU)ID_STATUS, nullptr, nullptr);
     SendMessageW((HWND)status_label_, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
     y += 30;
 
-    // ── PLAY button ──────────────────────────────────────────────────────
     play_button_ = CreateWindowW(L"BUTTON", L"\u25B6  PLAY",
-        WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON|BS_OWNERDRAW,
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_OWNERDRAW,
         195, y, 310, 50, h, (HMENU)ID_PLAY_BTN, nullptr, nullptr);
     y += 62;
 
-    // ── Open folder button ───────────────────────────────────────────────
     HWND hFolder = CreateWindowW(L"BUTTON", L"Open Data Folder",
-        WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         30, y, 140, 26, h, (HMENU)ID_FOLDER_BTN, nullptr, nullptr);
     SendMessageW(hFolder, WM_SETFONT, (WPARAM)g_smallFont, TRUE);
 }
@@ -231,13 +215,13 @@ void UI::load_config_to_ui() {
     SetWindowTextW((HWND)ram_label_, to_w(std::to_string(gb) + " GB").c_str());
 
     SetWindowTextW((HWND)java_path_edit_, to_w(cfg.java_path).c_str());
-    SetWindowTextW((HWND)jvm_args_edit_,  to_w(cfg.jvm_args).c_str());
+    SetWindowTextW((HWND)jvm_args_edit_, to_w(cfg.jvm_args).c_str());
 }
 
 void UI::save_config_from_ui() {
     auto& cfg = Config::instance();
 
-    cfg.username    = get_edit_text((HWND)username_edit_);
+    cfg.username     = get_edit_text((HWND)username_edit_);
     cfg.offline_mode = (SendMessageW((HWND)offline_check_, BM_GETCHECK, 0, 0) == BST_CHECKED);
 
     int gb = (int)SendMessageW((HWND)ram_slider_, TBM_GETPOS, 0, 0);
@@ -273,8 +257,6 @@ void UI::populate_versions() {
 }
 
 void UI::update_status(const std::string& text, int percent) {
-    // Safe to call from any thread via PostMessage trick, but here we
-    // only call it from the UI thread path for simplicity.
     SetWindowTextW((HWND)status_label_, to_w(text).c_str());
     if (percent >= 0)
         SendMessageW((HWND)progress_bar_, PBM_SETPOS, (WPARAM)percent, 0);
@@ -327,7 +309,6 @@ void UI::on_play() {
 
     std::thread([this, version_id]() {
         launcher_.download_version(version_id, [this](const LaunchProgress& p) {
-            // Post a status update message back to the UI thread
             std::string* msg = new std::string(p.stage);
             PostMessageW((HWND)hwnd_, WM_USER + 2,
                 (WPARAM)p.percent, (LPARAM)msg);
@@ -343,37 +324,40 @@ void UI::on_play() {
     }).detach();
 }
 
-// ── Window procedure ─────────────────────────────────────────────────────────
 LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
                               unsigned long long wp, long long lp) {
     HWND h = (HWND)hwnd;
 
     switch (msg) {
 
-    // ── Background / control colours ──────────────────────────────────────
     case WM_ERASEBKGND: {
-        RECT rc; GetClientRect(h, &rc);
+        RECT rc;
+        GetClientRect(h, &rc);
         FillRect((HDC)wp, &rc, g_bgBrush);
         return 1;
     }
+
     case WM_CTLCOLORSTATIC: {
         HDC hdc = (HDC)wp;
         SetTextColor(hdc, TEXT_COLOR);
         SetBkColor(hdc, BG_COLOR);
         return (LRESULT)g_bgBrush;
     }
+
     case WM_CTLCOLOREDIT: {
         HDC hdc = (HDC)wp;
         SetTextColor(hdc, TEXT_COLOR);
         SetBkColor(hdc, BG_CONTROL);
         return (LRESULT)g_ctrlBrush;
     }
+
     case WM_CTLCOLORBTN: {
         HDC hdc = (HDC)wp;
         SetTextColor(hdc, TEXT_COLOR);
         SetBkColor(hdc, BG_COLOR);
         return (LRESULT)g_bgBrush;
     }
+
     case WM_CTLCOLORLISTBOX: {
         HDC hdc = (HDC)wp;
         SetTextColor(hdc, TEXT_COLOR);
@@ -381,15 +365,14 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         return (LRESULT)g_ctrlBrush;
     }
 
-    // ── Owner-draw PLAY button ────────────────────────────────────────────
     case WM_DRAWITEM: {
         auto* dis = (DRAWITEMSTRUCT*)lp;
         if (dis->CtlID == ID_PLAY_BTN) {
             bool pressed = (dis->itemState & ODS_SELECTED) != 0;
             COLORREF col = pressed ? ACCENT_HOVER : ACCENT_COLOR;
             HBRUSH br = CreateSolidBrush(col);
-            HRGN rgn  = CreateRoundRectRgn(
-                dis->rcItem.left,  dis->rcItem.top,
+            HRGN rgn = CreateRoundRectRgn(
+                dis->rcItem.left, dis->rcItem.top,
                 dis->rcItem.right, dis->rcItem.bottom, 14, 14);
             FillRgn(dis->hDC, rgn, br);
             DeleteObject(rgn);
@@ -405,7 +388,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             if (dis->itemState & ODS_FOCUS) {
-                // Draw focus rect slightly inset
                 InflateRect(&dis->rcItem, -4, -4);
                 DrawFocusRect(dis->hDC, &dis->rcItem);
             }
@@ -414,7 +396,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── RAM slider ────────────────────────────────────────────────────────
     case WM_HSCROLL: {
         if (g_ui && (HWND)lp == (HWND)g_ui->ram_slider_) {
             int gb = (int)SendMessageW((HWND)g_ui->ram_slider_, TBM_GETPOS, 0, 0);
@@ -424,9 +405,8 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── Commands ──────────────────────────────────────────────────────────
     case WM_COMMAND: {
-        int id   = LOWORD(wp);
+        int id = LOWORD(wp);
         switch (id) {
         case ID_PLAY_BTN:
             g_ui->on_play();
@@ -441,24 +421,22 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
             break;
 
         case ID_BROWSE_JAVA_BTN: {
-            // OPENFILENAMEW lives in <commdlg.h>
             wchar_t file[MAX_PATH] = {};
-            OPENFILENAMEW ofn      = {};
-            ofn.lStructSize  = sizeof(ofn);
-            ofn.hwndOwner    = h;
-            ofn.lpstrFilter  =
+            OPENFILENAMEW ofn = {};
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner   = h;
+            ofn.lpstrFilter =
                 L"Java Executable\0javaw.exe;java.exe\0All Files\0*.*\0";
-            ofn.lpstrFile    = file;
-            ofn.nMaxFile     = MAX_PATH;
-            ofn.Flags        = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-            ofn.lpstrTitle   = L"Select Java Executable";
+            ofn.lpstrFile   = file;
+            ofn.nMaxFile    = MAX_PATH;
+            ofn.Flags       = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+            ofn.lpstrTitle  = L"Select Java Executable";
             if (GetOpenFileNameW(&ofn))
                 SetWindowTextW((HWND)g_ui->java_path_edit_, file);
             break;
         }
 
         case ID_FOLDER_BTN: {
-            // ShellExecuteW lives in <shellapi.h>
             std::wstring dir = Config::instance().base_dir().wstring();
             ShellExecuteW(nullptr, L"open", dir.c_str(),
                           nullptr, nullptr, SW_SHOWNORMAL);
@@ -468,7 +446,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── Async: version fetch done ─────────────────────────────────────────
     case WM_USER + 1: {
         g_ui->loading_ = false;
         EnableWindow((HWND)g_ui->play_button_, TRUE);
@@ -484,9 +461,7 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── Async: progress update ────────────────────────────────────────────
     case WM_USER + 2: {
-        // lp is a heap-allocated std::string*
         std::string* msg = reinterpret_cast<std::string*>(lp);
         if (msg) {
             g_ui->update_status(*msg, (int)wp);
@@ -495,7 +470,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── Async: launch done ────────────────────────────────────────────────
     case WM_USER + 3: {
         g_ui->loading_ = false;
         EnableWindow((HWND)g_ui->play_button_, TRUE);
@@ -509,7 +483,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
         break;
     }
 
-    // ── Window constraints ────────────────────────────────────────────────
     case WM_GETMINMAXINFO: {
         auto* mmi = (MINMAXINFO*)lp;
         mmi->ptMinTrackSize = {720, 530};
@@ -526,7 +499,6 @@ LRESULT CALLBACK UI::WndProc(void* hwnd, unsigned int msg,
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-// ── UI::run ───────────────────────────────────────────────────────────────────
 int UI::run() {
     g_ui = this;
     init_gdi_resources();
@@ -548,7 +520,6 @@ int UI::run() {
     wc.hbrBackground = g_bgBrush;
     RegisterClassExW(&wc);
 
-    // Centre on work area
     RECT desk = {};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &desk, 0);
     int wx = (desk.right  - 720) / 2;
@@ -562,10 +533,8 @@ int UI::run() {
         wx, wy, 720, 530,
         nullptr, nullptr, wc.hInstance, nullptr);
 
-    // Dark title bar (Windows 10 1809+)
     BOOL dark = TRUE;
-    DwmSetWindowAttribute((HWND)hwnd_, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/,
-                          &dark, sizeof(dark));
+    DwmSetWindowAttribute((HWND)hwnd_, 20, &dark, sizeof(dark));
 
     create_controls();
     load_config_to_ui();
@@ -573,7 +542,7 @@ int UI::run() {
     ShowWindow((HWND)hwnd_, SW_SHOW);
     UpdateWindow((HWND)hwnd_);
 
-    on_refresh(); // auto-load version list
+    on_refresh();
 
     MSG msg = {};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -584,20 +553,18 @@ int UI::run() {
 }
 
 #else
-// ═══════════════════════════════════════════════════════════════════════════════
-// Linux / GTK3
-// ═══════════════════════════════════════════════════════════════════════════════
+
 #include <gtk/gtk.h>
 
-static GtkWidget* g_window        = nullptr;
-static GtkWidget* g_username_e    = nullptr;
-static GtkWidget* g_version_cb    = nullptr;
-static GtkWidget* g_progress      = nullptr;
-static GtkWidget* g_status_lbl    = nullptr;
-static GtkWidget* g_ram_scale     = nullptr;
-static GtkWidget* g_java_e        = nullptr;
-static GtkWidget* g_jvm_e         = nullptr;
-static GtkWidget* g_snapshot_chk  = nullptr;
+static GtkWidget* g_window       = nullptr;
+static GtkWidget* g_username_e   = nullptr;
+static GtkWidget* g_version_cb   = nullptr;
+static GtkWidget* g_progress     = nullptr;
+static GtkWidget* g_status_lbl   = nullptr;
+static GtkWidget* g_ram_scale    = nullptr;
+static GtkWidget* g_java_e       = nullptr;
+static GtkWidget* g_jvm_e        = nullptr;
+static GtkWidget* g_snapshot_chk = nullptr;
 
 static Launcher  g_launcher;
 static std::vector<VersionInfo> g_versions;
@@ -662,13 +629,13 @@ static void on_play(GtkWidget*, gpointer) {
         return;
     }
 
-    auto& cfg       = Config::instance();
-    cfg.username    = username;
-    cfg.uuid        = auth.uuid;
+    auto& cfg        = Config::instance();
+    cfg.username     = username;
+    cfg.uuid         = auth.uuid;
     cfg.access_token = auth.access_token;
-    cfg.ram_mb      = (int)gtk_range_get_value(GTK_RANGE(g_ram_scale)) * 1024;
-    cfg.java_path   = gtk_entry_get_text(GTK_ENTRY(g_java_e));
-    cfg.jvm_args    = gtk_entry_get_text(GTK_ENTRY(g_jvm_e));
+    cfg.ram_mb       = (int)gtk_range_get_value(GTK_RANGE(g_ram_scale)) * 1024;
+    cfg.java_path    = gtk_entry_get_text(GTK_ENTRY(g_java_e));
+    cfg.jvm_args     = gtk_entry_get_text(GTK_ENTRY(g_jvm_e));
 
     int sel = gtk_combo_box_get_active(GTK_COMBO_BOX(g_version_cb));
     if (sel < 0 || sel >= (int)g_versions.size()) return;
@@ -689,7 +656,6 @@ static void on_play(GtkWidget*, gpointer) {
 int UI::run() {
     gtk_init(nullptr, nullptr);
 
-    // Dark CSS
     GtkCssProvider* css = gtk_css_provider_new();
     gtk_css_provider_load_from_data(css,
         "window,box{background-color:#1e1e24}"
@@ -707,7 +673,7 @@ int UI::run() {
         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     g_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(g_window), "OmniLauncher — Minecraft Launcher");
+    gtk_window_set_title(GTK_WINDOW(g_window), "OmniLauncher - Minecraft Launcher");
     gtk_window_set_default_size(GTK_WINDOW(g_window), 700, 520);
     gtk_window_set_resizable(GTK_WINDOW(g_window), FALSE);
     g_signal_connect(g_window, "destroy", G_CALLBACK(gtk_main_quit), nullptr);
@@ -716,13 +682,11 @@ int UI::run() {
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 20);
     gtk_container_add(GTK_CONTAINER(g_window), vbox);
 
-    // Title
     GtkWidget* title = gtk_label_new(nullptr);
     gtk_label_set_markup(GTK_LABEL(title),
-        "<span font='20' weight='bold'>⬡ OmniLauncher</span>");
+        "<span font='20' weight='bold'>\u2B21 OmniLauncher</span>");
     gtk_box_pack_start(GTK_BOX(vbox), title, FALSE, FALSE, 4);
 
-    // Username
     GtkWidget* ur = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(ur), gtk_label_new("Username:"), FALSE, FALSE, 0);
     g_username_e = gtk_entry_new();
@@ -731,21 +695,19 @@ int UI::run() {
     gtk_box_pack_start(GTK_BOX(ur), g_username_e, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), ur, FALSE, FALSE, 0);
 
-    // Version
     GtkWidget* vr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(vr), gtk_label_new("Version:"), FALSE, FALSE, 0);
     g_version_cb = gtk_combo_box_text_new();
     gtk_box_pack_start(GTK_BOX(vr), g_version_cb, TRUE, TRUE, 0);
     g_snapshot_chk = gtk_check_button_new_with_label("Snapshots");
     g_signal_connect(g_snapshot_chk, "toggled",
-        G_CALLBACK(+[](GtkWidget*, gpointer){ gtk_populate_versions(); }), nullptr);
+        G_CALLBACK(+[](GtkWidget*, gpointer) { gtk_populate_versions(); }), nullptr);
     gtk_box_pack_start(GTK_BOX(vr), g_snapshot_chk, FALSE, FALSE, 0);
-    GtkWidget* ref_btn = gtk_button_new_with_label("↻");
+    GtkWidget* ref_btn = gtk_button_new_with_label("\u21BB");
     g_signal_connect(ref_btn, "clicked", G_CALLBACK(on_refresh), nullptr);
     gtk_box_pack_start(GTK_BOX(vr), ref_btn, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), vr, FALSE, FALSE, 0);
 
-    // RAM
     GtkWidget* rr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(rr), gtk_label_new("RAM (GB):"), FALSE, FALSE, 0);
     g_ram_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 1, 16, 1);
@@ -753,7 +715,6 @@ int UI::run() {
     gtk_box_pack_start(GTK_BOX(rr), g_ram_scale, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), rr, FALSE, FALSE, 0);
 
-    // Java
     GtkWidget* jr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(jr), gtk_label_new("Java:"), FALSE, FALSE, 0);
     g_java_e = gtk_entry_new();
@@ -762,7 +723,6 @@ int UI::run() {
     gtk_box_pack_start(GTK_BOX(jr), g_java_e, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), jr, FALSE, FALSE, 0);
 
-    // JVM args
     GtkWidget* jvr = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(jvr), gtk_label_new("JVM Args:"), FALSE, FALSE, 0);
     g_jvm_e = gtk_entry_new();
@@ -770,16 +730,13 @@ int UI::run() {
     gtk_box_pack_start(GTK_BOX(jvr), g_jvm_e, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), jvr, FALSE, FALSE, 0);
 
-    // Progress
     g_progress = gtk_progress_bar_new();
     gtk_box_pack_start(GTK_BOX(vbox), g_progress, FALSE, FALSE, 4);
 
-    // Status
-    g_status_lbl = gtk_label_new("Ready — click ↻ to load versions");
+    g_status_lbl = gtk_label_new("Ready \u2014 click \u21BB to load versions");
     gtk_box_pack_start(GTK_BOX(vbox), g_status_lbl, FALSE, FALSE, 0);
 
-    // Play
-    GtkWidget* play = gtk_button_new_with_label("▶  PLAY");
+    GtkWidget* play = gtk_button_new_with_label("\u25B6  PLAY");
     g_signal_connect(play, "clicked", G_CALLBACK(on_play), nullptr);
     gtk_box_pack_start(GTK_BOX(vbox), play, FALSE, FALSE, 8);
 
@@ -789,4 +746,4 @@ int UI::run() {
     return 0;
 }
 
-#endif // _WIN32
+#endif

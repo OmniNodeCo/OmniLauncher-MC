@@ -36,7 +36,6 @@ if(WIN32)
         shlwapi
         dwmapi
         uxtheme
-        gdiplus
     )
     target_compile_definitions(OmniLauncher PRIVATE
         UNICODE
@@ -44,12 +43,20 @@ if(WIN32)
         WIN32_LEAN_AND_MEAN
         NOMINMAX
     )
+    target_compile_options(OmniLauncher PRIVATE /wd4005)
 elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-    pkg_check_modules(CURL REQUIRED libcurl)
-    target_include_directories(OmniLauncher PRIVATE ${GTK3_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
-    target_link_libraries(OmniLauncher PRIVATE ${GTK3_LIBRARIES} ${CURL_LIBRARIES} pthread)
+    pkg_check_modules(GTK3  REQUIRED gtk+-3.0)
+    pkg_check_modules(CURL  REQUIRED libcurl)
+    target_include_directories(OmniLauncher PRIVATE
+        ${GTK3_INCLUDE_DIRS}
+        ${CURL_INCLUDE_DIRS}
+    )
+    target_link_libraries(OmniLauncher PRIVATE
+        ${GTK3_LIBRARIES}
+        ${CURL_LIBRARIES}
+        pthread
+    )
     target_compile_options(OmniLauncher PRIVATE ${GTK3_CFLAGS_OTHER})
 endif()
 
