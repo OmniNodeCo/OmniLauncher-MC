@@ -20,54 +20,38 @@ jobs:
       - name: Generate icon.ico
         shell: pwsh
         run: |
-          # Minimal valid 16x16 32bpp green .ico file (binary literal)
-          function New-Ico {
-            param([string]$Path)
-            # ICONDIR header: reserved=0, type=1 (icon), count=1
-            $header = [byte[]](0,0, 1,0, 1,0)
-            # ICONDIRENTRY: width=16, height=16, colorCount=0, reserved=0,
-            #   planes=1, bitCount=32, bytesInRes=?, imageOffset=?
-            # BMP data size = BITMAPINFOHEADER(40) + pixels(16*32*4) + mask(16*4*2) = 40+2048+128 = 2216
-            $bmpSize = 40 + 16*32*4  # no AND mask needed for 32bpp with alpha
-            $bmpSize = 40 + 16*16*4 + 16*4  # header + XOR + AND mask rows
-            $totalBmp = 40 + 2048 + 128
-            $offset = 6 + 16  # ICONDIR + ICONDIRENTRY
-            $entry = [byte[]](
-              16, 16,   # width, height
-              0,        # color count (0 = >256 colors)
-              0,        # reserved
-              1, 0,     # planes
-              32, 0,    # bit count
-              ($totalBmp -band 0xFF), (($totalBmp -shr 8) -band 0xFF),
-              0, 0,     # size high bytes
-              ($offset -band 0xFF), (($offset -shr 8) -band 0xFF),
-              0, 0      # offset high bytes
-            )
-            # BITMAPINFOHEADER
-            $bih = New-Object byte[] 40
-            [BitConverter]::GetBytes([int32]40).CopyTo($bih, 0)    # biSize
-            [BitConverter]::GetBytes([int32]16).CopyTo($bih, 4)    # biWidth
-            [BitConverter]::GetBytes([int32]32).CopyTo($bih, 8)    # biHeight (double for XOR+AND)
-            [BitConverter]::GetBytes([int16]1).CopyTo($bih, 12)    # biPlanes
-            [BitConverter]::GetBytes([int16]32).CopyTo($bih, 14)   # biBitCount
-            [BitConverter]::GetBytes([int32]0).CopyTo($bih, 16)    # biCompression
-            [BitConverter]::GetBytes([int32]2048).CopyTo($bih, 20) # biSizeImage
-            # XOR bitmap: 16x16 pixels, BGRA, green (#4CAF50) fully opaque
-            $xor = New-Object byte[] 2048
-            for ($i = 0; $i -lt 2048; $i += 4) {
-              $xor[$i+0] = 0x50  # B
-              $xor[$i+1] = 0xAF  # G
-              $xor[$i+2] = 0x4C  # R
-              $xor[$i+3] = 0xFF  # A
-            }
-            # AND mask: 16 rows * 4 bytes (32 bits per row, padded) = all 0 (fully opaque)
-            $and = New-Object byte[] 128
-            $all = $header + $entry + $bih + $xor + $and
-            [IO.File]::WriteAllBytes($Path, $all)
+          $bih = New-Object byte[] 40
+          [BitConverter]::GetBytes([int32]40).CopyTo($bih, 0)
+          [BitConverter]::GetBytes([int32]16).CopyTo($bih, 4)
+          [BitConverter]::GetBytes([int32]32).CopyTo($bih, 8)
+          [BitConverter]::GetBytes([int16]1).CopyTo($bih, 12)
+          [BitConverter]::GetBytes([int16]32).CopyTo($bih, 14)
+          [BitConverter]::GetBytes([int32]0).CopyTo($bih, 16)
+          [BitConverter]::GetBytes([int32]2048).CopyTo($bih, 20)
+          $xor = New-Object byte[] 2048
+          for ($i = 0; $i -lt 2048; $i += 4) {
+            $xor[$i]=0x50; $xor[$i+1]=0xAF; $xor[$i+2]=0x4C; $xor[$i+3]=0xFF
           }
+          $and = New-Object byte[] 128
+          $totalBmp = 40 + 2048 + 128
+          $offset = 6 + 16
+          $header = [byte[]](0,0,1,0,1,0)
+          $entry = [byte[]](
+            16,16,0,0,1,0,32,0,
+            ($totalBmp -band 0xFF),(($totalBmp -shr 8) -band 0xFF),0,0,
+            ($offset   -band 0xFF),(($offset   -shr 8) -band 0xFF),0,0
+          )
           New-Item -Force -ItemType Directory assets | Out-Null
-          New-Ico -Path "assets/icon.ico"
-          Write-Host "Icon created: $((Get-Item assets/icon.ico).Length) bytes"
+          [IO.File]::WriteAllBytes("assets/icon.ico", ($header+$entry+$bih+$xor+$and))
+          Write-Host "Icon: $((Get-Item assets/icon.ico).Length) bytes"
+
+      - name: Ensure resource.h has proper line endings
+        shell: pwsh
+        run: |
+          # Write with explicit CRLF to satisfy RC compiler
+          $content = "#ifndef RESOURCE_H`r`n#define RESOURCE_H`r`n`r`n#define IDI_APPICON  101`r`n#define IDI_TRAYICON 102`r`n`r`n#endif`r`n"
+          [IO.File]::WriteAllText("src/resource.h", $content, [Text.Encoding]::ASCII)
+          Write-Host "resource.h written: $((Get-Item src/resource.h).Length) bytes"
 
       - name: Configure CMake
         run: cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release

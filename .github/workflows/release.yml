@@ -33,11 +33,11 @@ jobs:
           for ($i = 0; $i -lt 2048; $i += 4) {
             $xor[$i]=0x50; $xor[$i+1]=0xAF; $xor[$i+2]=0x4C; $xor[$i+3]=0xFF
           }
-          $and  = New-Object byte[] 128
+          $and = New-Object byte[] 128
           $totalBmp = 40 + 2048 + 128
-          $offset   = 6 + 16
+          $offset = 6 + 16
           $header = [byte[]](0,0,1,0,1,0)
-          $entry  = [byte[]](
+          $entry = [byte[]](
             16,16,0,0,1,0,32,0,
             ($totalBmp -band 0xFF),(($totalBmp -shr 8) -band 0xFF),0,0,
             ($offset   -band 0xFF),(($offset   -shr 8) -band 0xFF),0,0
@@ -45,7 +45,13 @@ jobs:
           New-Item -Force -ItemType Directory assets | Out-Null
           [IO.File]::WriteAllBytes("assets/icon.ico", ($header+$entry+$bih+$xor+$and))
 
-      - name: Configure & Build
+      - name: Ensure resource.h has proper line endings
+        shell: pwsh
+        run: |
+          $content = "#ifndef RESOURCE_H`r`n#define RESOURCE_H`r`n`r`n#define IDI_APPICON  101`r`n#define IDI_TRAYICON 102`r`n`r`n#endif`r`n"
+          [IO.File]::WriteAllText("src/resource.h", $content, [Text.Encoding]::ASCII)
+
+      - name: Configure and Build
         run: |
           cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
           cmake --build build
