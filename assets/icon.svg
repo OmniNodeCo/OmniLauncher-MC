@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#16213e;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0f3460;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#2E7D32;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#66BB6A;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#43A047;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="pickGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#B0BEC5;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#78909C;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="pickHead" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0288D1;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="2"/>
+      <feGaussianBlur stdDeviation="3"/>
+      <feComposite operator="out" in="SourceGraphic"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feComposite operator="over" in="SourceGraphic"/>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="480" height="480" rx="80" ry="80" fill="url(#bgGrad)" filter="url(#shadow)"/>
+  
+  <!-- Decorative circuit lines -->
+  <g stroke="#4CAF50" stroke-opacity="0.15" stroke-width="1.5" fill="none">
+    <path d="M80 140 L160 140 L180 120"/>
+    <path d="M80 380 L140 380 L160 360"/>
+    <path d="M432 160 L380 160 L360 140"/>
+    <path d="M432 350 L370 350 L350 370"/>
+    <circle cx="80" cy="140" r="3" fill="#4CAF50" fill-opacity="0.3"/>
+    <circle cx="432" cy="160" r="3" fill="#4CAF50" fill-opacity="0.3"/>
+    <circle cx="80" cy="380" r="3" fill="#4CAF50" fill-opacity="0.3"/>
+    <circle cx="432" cy="350" r="3" fill="#4CAF50" fill-opacity="0.3"/>
+  </g>
+  
+  <!-- Outer hexagon glow -->
+  <polygon points="256,80 406,167 406,340 256,427 106,340 106,167" 
+           fill="none" stroke="#4CAF50" stroke-width="3" stroke-opacity="0.25" filter="url(#glow)"/>
+  
+  <!-- Main hexagon -->
+  <polygon points="256,95 393,175 393,335 256,415 119,335 119,175" 
+           fill="url(#hexGrad)" stroke="#66BB6A" stroke-width="2.5" filter="url(#innerShadow)"/>
+  
+  <!-- Inner hexagon detail -->
+  <polygon points="256,130 365,195 365,315 256,380 147,315 147,195" 
+           fill="url(#innerGrad)" fill-opacity="0.3" stroke="#A5D6A7" stroke-width="1" stroke-opacity="0.5"/>
+  
+  <!-- Pickaxe: handle -->
+  <g filter="url(#shadow)">
+    <rect x="245" y="220" width="22" height="145" rx="4" fill="url(#pickGrad)" 
+          transform="rotate(-45,256,280)"/>
+    <!-- Handle grip lines -->
+    <line x1="250" y1="310" x2="262" y2="310" stroke="#546E7A" stroke-width="2" 
+          transform="rotate(-45,256,280)"/>
+    <line x1="250" y1="320" x2="262" y2="320" stroke="#546E7A" stroke-width="2" 
+          transform="rotate(-45,256,280)"/>
+    <line x1="250" y1="330" x2="262" y2="330" stroke="#546E7A" stroke-width="2" 
+          transform="rotate(-45,256,280)"/>
+  </g>
+  
+  <!-- Pickaxe: head -->
+  <g filter="url(#shadow)">
+    <path d="M215,195 L256,170 L297,195 L280,212 L256,205 L232,212 Z" 
+          fill="url(#pickHead)" stroke="#0277BD" stroke-width="2"
+          transform="rotate(-45,256,220)"/>
+    <!-- Head highlight -->
+    <path d="M230,198 L256,178 L270,192" 
+          fill="none" stroke="#B3E5FC" stroke-width="1.5" stroke-opacity="0.6"
+          transform="rotate(-45,256,220)"/>
+  </g>
+  
+  <!-- Block grid pattern (minecraft style) on bottom -->
+  <g fill-opacity="0.08" fill="#4CAF50">
+    <rect x="170" y="310" width="24" height="24"/>
+    <rect x="198" y="310" width="24" height="24"/>
+    <rect x="184" y="334" width="24" height="24"/>
+    <rect x="290" y="310" width="24" height="24"/>
+    <rect x="318" y="310" width="24" height="24"/>
+    <rect x="304" y="334" width="24" height="24"/>
+  </g>
+  
+  <!-- Node connection dots (OmniNode branding) -->
+  <g fill="#4CAF50" fill-opacity="0.6">
+    <circle cx="256" cy="95" r="5"/>
+    <circle cx="393" cy="175" r="5"/>
+    <circle cx="393" cy="335" r="5"/>
+    <circle cx="256" cy="415" r="5"/>
+    <circle cx="119" cy="335" r="5"/>
+    <circle cx="119" cy="175" r="5"/>
+  </g>
+  
+  <!-- "O" letter watermark -->
+  <text x="256" y="440" text-anchor="middle" font-family="monospace" font-size="18" 
+        font-weight="bold" fill="#4CAF50" fill-opacity="0.2">OMNI</text>
+</svg>

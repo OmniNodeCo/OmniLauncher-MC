@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="iBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+    <linearGradient id="iAccent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50"/>
+      <stop offset="100%" style="stop-color:#2E7D32"/>
+    </linearGradient>
+    <linearGradient id="iArrow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#81C784"/>
+      <stop offset="100%" style="stop-color:#4CAF50"/>
+    </linearGradient>
+    <linearGradient id="iBox" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#37474F"/>
+      <stop offset="100%" style="stop-color:#263238"/>
+    </linearGradient>
+    <filter id="iGlow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="iShadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="16" y="16" width="480" height="480" rx="80" ry="80" fill="url(#iBg)"/>
+  
+  <!-- Hexagon outline -->
+  <polygon points="256,70 420,165 420,345 256,440 92,345 92,165" 
+           fill="none" stroke="#4CAF50" stroke-width="2" stroke-opacity="0.2"/>
+  
+  <!-- Open box bottom -->
+  <g filter="url(#iShadow)">
+    <path d="M140,300 L256,360 L372,300 L372,380 L256,440 L140,380 Z" 
+          fill="url(#iBox)" stroke="#4CAF50" stroke-width="2"/>
+    <!-- Box front face -->
+    <path d="M140,300 L256,360 L256,440 L140,380 Z" fill="#263238" fill-opacity="0.6"/>
+    <path d="M256,360 L372,300 L372,380 L256,440 Z" fill="#37474F" fill-opacity="0.6"/>
+  </g>
+  
+  <!-- Box flaps open -->
+  <path d="M140,300 L180,250 L256,290 L256,360 Z" fill="#455A64" fill-opacity="0.5" stroke="#4CAF50" stroke-width="1"/>
+  <path d="M372,300 L332,250 L256,290 L256,360 Z" fill="#546E7A" fill-opacity="0.5" stroke="#4CAF50" stroke-width="1"/>
+  
+  <!-- Download arrow -->
+  <g filter="url(#iGlow)">
+    <!-- Arrow shaft -->
+    <rect x="238" y="100" width="36" height="130" rx="4" fill="url(#iArrow)"/>
+    <!-- Arrow head -->
+    <polygon points="205,230 256,290 307,230" fill="url(#iArrow)"/>
+    <!-- Arrow shine -->
+    <rect x="248" y="110" width="8" height="100" rx="2" fill="#C8E6C9" fill-opacity="0.4"/>
+  </g>
+  
+  <!-- Speed lines -->
+  <g stroke="#4CAF50" stroke-opacity="0.3" stroke-width="2">
+    <line x1="195" y1="140" x2="195" y2="180"/>
+    <line x1="317" y1="130" x2="317" y2="170"/>
+    <line x1="175" y1="170" x2="175" y2="200"/>
+    <line x1="337" y1="160" x2="337" y2="190"/>
+  </g>
+  
+  <!-- Corner hex dots -->
+  <g fill="#4CAF50" fill-opacity="0.5">
+    <circle cx="256" cy="70" r="4"/>
+    <circle cx="420" cy="165" r="4"/>
+    <circle cx="420" cy="345" r="4"/>
+    <circle cx="92" cy="165" r="4"/>
+    <circle cx="92" cy="345" r="4"/>
+  </g>
+  
+  <!-- INSTALL text -->
+  <text x="256" y="470" text-anchor="middle" font-family="monospace" font-size="14" 
+        font-weight="bold" fill="#4CAF50" fill-opacity="0.3" letter-spacing="4">INSTALL</text>
+</svg>

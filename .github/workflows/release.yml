@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Generate icon
+        shell: pwsh
+        run: |
+          $bmp = New-Object byte[] 1064
+          [System.BitConverter]::GetBytes([int32]40).CopyTo($bmp, 0)
+          [System.BitConverter]::GetBytes([int32]16).CopyTo($bmp, 4)
+          [System.BitConverter]::GetBytes([int32]32).CopyTo($bmp, 8)
+          [System.BitConverter]::GetBytes([int16]1).CopyTo($bmp, 12)
+          [System.BitConverter]::GetBytes([int16]32).CopyTo($bmp, 14)
+          for ($i = 40; $i -lt 1064; $i += 4) {
+            $bmp[$i] = 0x50; $bmp[$i+1] = 0xAF; $bmp[$i+2] = 0x4C; $bmp[$i+3] = 0xFF
+          }
+          $ico = [byte[]]@(0,0,1,0,1,0,16,16,0,0,1,0,32,0)
+          $ico += [System.BitConverter]::GetBytes([int32]$bmp.Length)
+          $ico += [System.BitConverter]::GetBytes([int32]($ico.Length + 4))
+          [System.IO.File]::WriteAllBytes("assets/icon.ico", $ico + $bmp)
+
+      - name: Build
+        run: |
+          cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      - name: Create installer
+        run: |
+          choco install innosetup -y
+          iscc installer/setup.iss
+        continue-on-error: true
+
+      - name: Package portable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item build/OmniLauncher.exe dist/
+          Compress-Archive -Path dist/OmniLauncher.exe -DestinationPath dist/OmniLauncher-Windows-x64-Portable.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: dist/*
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libgtk-3-dev libcurl4-openssl-dev
+
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/OmniLauncher dist/
+          chmod +x dist/OmniLauncher
+          cd dist && tar czf OmniLauncher-Linux-x64.tar.gz OmniLauncher
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: dist/OmniLauncher-Linux-x64.tar.gz
+
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-release
+          path: release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
