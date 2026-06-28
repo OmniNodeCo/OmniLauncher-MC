@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller build.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: dist/OmniLauncher-MC.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller build.spec
+
+      - name: Make executable
+        run: chmod +x dist/OmniLauncher-MC
+
+      - name: Tar artifact
+        run: tar -czvf dist/OmniLauncher-MC-Linux.tar.gz -C dist OmniLauncher-MC
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Linux
+          path: dist/OmniLauncher-MC-Linux.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller build.spec
+
+      - name: Zip app bundle
+        run: cd dist && zip -r OmniLauncher-MC-macOS.zip OmniLauncher-MC.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-macOS
+          path: dist/OmniLauncher-MC-macOS.zip
+
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: release/
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Linux
+          path: release/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-macOS
+          path: release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OmniLauncher-MC ${{ github.ref_name }}
+          body: |
+            ## OmniLauncher-MC ${{ github.ref_name }}
+
+            ### Downloads
+            - **Windows**: `OmniLauncher-MC.exe`
+            - **Linux**: `OmniLauncher-MC-Linux.tar.gz`
+            - **macOS**: `OmniLauncher-MC-macOS.zip`
+
+            ### What's New
+            See the commit history for changes in this release.
+          files: |
+            release/OmniLauncher-MC.exe
+            release/OmniLauncher-MC-Linux.tar.gz
+            release/OmniLauncher-MC-macOS.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
