@@ -4,26 +4,55 @@ import os
 
 block_cipher = None
 
-# Resolve icon path based on platform
+src_path = os.path.join(os.path.dirname(os.path.abspath(SPEC)), "src")
+
+
 def get_icon():
     if sys.platform == "darwin":
         return "assets/icon.icns"
     elif sys.platform == "win32":
         return "assets/icon.ico"
     else:
-        return "assets/icon.png"
+        return None
+
 
 a = Analysis(
-    ["src/main.py"],
-    pathex=[],
+    [os.path.join(src_path, "main.py")],
+    pathex=[src_path],
     binaries=[],
     datas=[
         ("assets", "assets"),
+        # Bundle all src modules explicitly so imports resolve
+        (os.path.join(src_path, "launcher.py"),  "."),
+        (os.path.join(src_path, "auth.py"),       "."),
+        (os.path.join(src_path, "downloader.py"), "."),
+        (os.path.join(src_path, "profiles.py"),   "."),
+        (os.path.join(src_path, "settings.py"),   "."),
+        (os.path.join(src_path, "utils.py"),      "."),
     ],
     hiddenimports=[
         "customtkinter",
         "PIL",
+        "PIL.Image",
+        "PIL.ImageDraw",
+        "PIL.ImageTk",
         "minecraft_launcher_lib",
+        "minecraft_launcher_lib.utils",
+        "minecraft_launcher_lib.install",
+        "minecraft_launcher_lib.command",
+        "minecraft_launcher_lib.types",
+        "requests",
+        "certifi",
+        "charset_normalizer",
+        "idna",
+        "urllib3",
+        # local modules
+        "launcher",
+        "auth",
+        "downloader",
+        "profiles",
+        "settings",
+        "utils",
     ],
     hookspath=[],
     hooksconfig={},
@@ -82,5 +111,5 @@ else:
         strip=False,
         upx=True,
         console=False,
-        icon=icon_file if sys.platform == "win32" else None,
+        icon=icon_file,
     )
