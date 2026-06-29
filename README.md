@@ -18,20 +18,19 @@
 
 ## Features
 
-- **Lightning Fast** - Built with Python and CustomTkinter, launches instantly
-- **Modern Dark UI** - Beautiful interface with smooth gradients and clean design
+- **Lightning Fast** - Python + CustomTkinter, launches instantly
+- **Modern Dark UI** - Beautiful interface with gradients and clean design
 - **Profile System** - Create and manage multiple game profiles
-- **Version Manager** - Browse, install, and manage all Minecraft versions
-- **Configurable** - Custom Java path, JVM arguments, RAM allocation
-- **Cross Platform** - Windows, macOS, and Linux support
-- **Lightweight** - ~50MB app size, minimal resource usage
-- **Open Source** - MIT licensed, community driven
+- **Version Manager** - Browse, install, manage all Minecraft versions
+- **Auto Updates** - Background update checking with skip/download options
+- **Full AppData** - Structured data directory with backup, export, validation
+- **Configurable** - Java path, JVM args, RAM allocation
+- **Cross Platform** - Windows, macOS, Linux
+- **Tested** - Import tests, unit tests, GUI tests in CI
 
 ## Getting Started
 
 ### Download
-
-Head to [Releases](https://github.com/OmniNodeCo/OmniLauncher-MC/releases) and download for your platform:
 
 | Platform | File |
 |----------|------|
@@ -46,47 +45,49 @@ git clone https://github.com/OmniNodeCo/OmniLauncher-MC.git
 cd OmniLauncher-MC
 pip install -r requirements.txt
 python src/main.py
-Build Executable
+Run Tests
+Bash
+
+pip install pytest
+cd src && python -m pytest ../tests/ -v
+Build
 Bash
 
 pip install pyinstaller
 python scripts/generate_icons.py
 pyinstaller build.spec
-Tech Stack
-Python 3.11+
-CustomTkinter - Modern UI toolkit
-minecraft-launcher-lib - Minecraft installation and launching
-Pillow - Image processing
-PyInstaller - Native executables
 Project Structure
 text
 
 OmniLauncher-MC/
-├── .github/workflows/   # CI/CD
-├── assets/              # Icons and images
+├── .github/workflows/   # CI/CD with tests
+├── assets/              # SVG icons
 ├── docs/                # Website
-├── scripts/             # Build scripts
+├── scripts/             # Icon generation
+├── tests/               # All tests
+│   ├── test_imports.py  # Import validation
+│   ├── test_gui.py      # GUI widget tests
+│   ├── test_settings.py # Settings tests
+│   ├── test_profiles.py # Profile tests
+│   ├── test_auth.py     # Auth tests
+│   └── test_updater.py  # Update checker tests
 ├── src/
 │   ├── main.py          # Entry point
 │   ├── launcher.py      # Main UI
+│   ├── appdata.py       # App data management
 │   ├── auth.py          # Authentication
-│   ├── downloader.py    # Version management
+│   ├── downloader.py    # Version downloads
 │   ├── profiles.py      # Profile system
 │   ├── settings.py      # Settings
+│   ├── updater.py       # Update checker
 │   └── utils.py         # Utilities
 ├── requirements.txt
 ├── build.spec
 └── setup.py
-Contributing
-Fork the repository
-Create your feature branch (git checkout -b feature/amazing-feature)
-Commit your changes (git commit -m 'Add amazing feature')
-Push to the branch (git push origin feature/amazing-feature)
-Open a Pull Request
 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - see LICENSE
 
 Disclaimer
-OmniLauncher-MC is not affiliated with Mojang Studios, Microsoft, or the Minecraft brand.
+Not affiliated with Mojang Studios or Microsoft.
 
-<div align="center"> Built by <a href="https://github.com/OmniNodeCo">OmniNodeCo</a> </div> ```
+<div align="center">Built by <a href="https://github.com/OmniNodeCo">OmniNodeCo</a></div> ```

@@ -18,10 +18,10 @@ from utils import get_app_dir, load_json, save_json
 class Profile:
     """Represents a game profile / instance."""
 
-    def __init__(self, name: str, version: str, profile_id: str = None,
-                 java_args: str = "", game_dir: str = "",
-                 created: str = None, last_played: str = None,
-                 loader: str = "vanilla", loader_version: str = ""):
+    def __init__(self, name, version, profile_id=None,
+                 java_args="", game_dir="",
+                 created=None, last_played=None,
+                 loader="vanilla", loader_version=""):
         self.id = profile_id or str(uuid.uuid4())[:8]
         self.name = name
         self.version = version
@@ -32,7 +32,7 @@ class Profile:
         self.created = created or datetime.now().isoformat()
         self.last_played = last_played or ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
@@ -46,7 +46,7 @@ class Profile:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Profile":
+    def from_dict(cls, data):
         return cls(
             name=data.get("name", "Unnamed"),
             version=data.get("version", ""),
@@ -63,26 +63,28 @@ class Profile:
 class ProfileManager:
     """Manages game profiles."""
 
-    def __init__(self):
-        self.filepath = get_app_dir() / "profiles.json"
+    def __init__(self, appdata_mgr=None):
+        if appdata_mgr:
+            self.filepath = appdata_mgr.get_file("profiles")
+        else:
+            self.filepath = get_app_dir() / "profiles.json"
         self.profiles = []
         self.active_id = ""
         self.load()
 
-    def load(self) -> None:
+    def load(self):
         data = load_json(self.filepath)
         self.profiles = [
             Profile.from_dict(p) for p in data.get("profiles", [])
         ]
         self.active_id = data.get("active", "")
-
         if not self.profiles:
             default = Profile(name="Default", version="latest-release")
             self.profiles.append(default)
             self.active_id = default.id
             self.save()
 
-    def save(self) -> None:
+    def save(self):
         data = {
             "active": self.active_id,
             "profiles": [p.to_dict() for p in self.profiles],
@@ -95,31 +97,31 @@ class ProfileManager:
                 return p
         return self.profiles[0] if self.profiles else None
 
-    def set_active(self, profile_id: str) -> None:
+    def set_active(self, profile_id):
         self.active_id = profile_id
         self.save()
 
-    def add(self, profile: Profile) -> None:
+    def add(self, profile):
         self.profiles.append(profile)
         self.save()
 
-    def remove(self, profile_id: str) -> None:
+    def remove(self, profile_id):
         self.profiles = [p for p in self.profiles if p.id != profile_id]
         if self.active_id == profile_id and self.profiles:
             self.active_id = self.profiles[0].id
         self.save()
 
-    def update(self, profile: Profile) -> None:
+    def update(self, profile):
         for i, p in enumerate(self.profiles):
             if p.id == profile.id:
                 self.profiles[i] = profile
                 break
         self.save()
 
-    def get_names(self) -> list:
+    def get_names(self):
         return [p.name for p in self.profiles]
 
-    def get_by_name(self, name: str):
+    def get_by_name(self, name):
         for p in self.profiles:
             if p.name == name:
                 return p

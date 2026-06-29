@@ -44,6 +44,8 @@ a = Analysis(
         "downloader",
         "profiles",
         "settings",
+        "updater",
+        "appdata",
         "utils",
     ],
     hookspath=[],

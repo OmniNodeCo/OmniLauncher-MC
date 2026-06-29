@@ -17,22 +17,25 @@ from utils import get_app_dir, load_json, save_json
 class AuthManager:
     """Manages player authentication. Currently supports offline mode."""
 
-    def __init__(self):
-        self.filepath = get_app_dir() / "auth.json"
+    def __init__(self, appdata_mgr=None):
+        if appdata_mgr:
+            self.filepath = appdata_mgr.get_file("auth")
+        else:
+            self.filepath = get_app_dir() / "auth.json"
         self.username = ""
         self.uuid = ""
         self.token = ""
         self.auth_type = "offline"
         self.load()
 
-    def load(self) -> None:
+    def load(self):
         data = load_json(self.filepath)
         self.username = data.get("username", "Player")
         self.uuid = data.get("uuid", self._generate_offline_uuid("Player"))
         self.token = data.get("token", "")
         self.auth_type = data.get("auth_type", "offline")
 
-    def save(self) -> None:
+    def save(self):
         data = {
             "username": self.username,
             "uuid": self.uuid,
@@ -41,15 +44,12 @@ class AuthManager:
         }
         save_json(self.filepath, data)
 
-    def login_offline(self, username: str) -> bool:
-        """Login with offline / local username."""
+    def login_offline(self, username):
         if not username or len(username) < 3 or len(username) > 16:
             return False
-
         clean = username.replace("_", "")
         if not clean.isalnum():
             return False
-
         self.username = username
         self.uuid = self._generate_offline_uuid(username)
         self.token = ""
@@ -57,16 +57,16 @@ class AuthManager:
         self.save()
         return True
 
-    def is_logged_in(self) -> bool:
+    def is_logged_in(self):
         return bool(self.username)
 
-    def logout(self) -> None:
+    def logout(self):
         self.username = ""
         self.uuid = ""
         self.token = ""
         self.save()
 
-    def get_login_data(self) -> dict:
+    def get_login_data(self):
         return {
             "username": self.username,
             "uuid": self.uuid,
@@ -74,5 +74,5 @@ class AuthManager:
         }
 
     @staticmethod
-    def _generate_offline_uuid(username: str) -> str:
+    def _generate_offline_uuid(username):
         return str(uuid.uuid3(uuid.NAMESPACE_DNS, "OfflinePlayer:" + username))

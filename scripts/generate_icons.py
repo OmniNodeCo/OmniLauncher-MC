@@ -18,7 +18,7 @@ try:
     from PIL import Image, ImageDraw
 except ImportError:
     print("Installing Pillow...")
-    os.system(f"{sys.executable} -m pip install Pillow")
+    os.system("%s -m pip install Pillow" % sys.executable)
     from PIL import Image, ImageDraw
 
 
@@ -26,20 +26,19 @@ ASSETS_DIR = Path(__file__).parent.parent / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def draw_icon(size: int) -> Image.Image:
-    """Draw OmniLauncher-MC icon at given size, returns RGBA image."""
+def draw_icon(size):
     scale = size / 512
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    bg_color_top = (108, 59, 245, 255)
-    bg_color_bot = (59, 130, 246, 255)
+    bg_top = (108, 59, 245, 255)
+    bg_bot = (59, 130, 246, 255)
 
     for y in range(size):
         t = y / max(size - 1, 1)
-        r = int(bg_color_top[0] * (1 - t) + bg_color_bot[0] * t)
-        g = int(bg_color_top[1] * (1 - t) + bg_color_bot[1] * t)
-        b = int(bg_color_top[2] * (1 - t) + bg_color_bot[2] * t)
+        r = int(bg_top[0] * (1 - t) + bg_bot[0] * t)
+        g = int(bg_top[1] * (1 - t) + bg_bot[1] * t)
+        b = int(bg_top[2] * (1 - t) + bg_bot[2] * t)
         draw.line([(0, y), (size - 1, y)], fill=(r, g, b, 255))
 
     mask = Image.new("L", (size, size), 0)
@@ -72,9 +71,9 @@ def draw_icon(size: int) -> Image.Image:
             x_start = max(0, cx - chord)
             x_end = min(size - 1, cx + chord)
             t = hy / max(size - 1, 1)
-            rr = int(bg_color_top[0] * (1 - t) + bg_color_bot[0] * t)
-            gg = int(bg_color_top[1] * (1 - t) + bg_color_bot[1] * t)
-            bb = int(bg_color_top[2] * (1 - t) + bg_color_bot[2] * t)
+            rr = int(bg_top[0] * (1 - t) + bg_bot[0] * t)
+            gg = int(bg_top[1] * (1 - t) + bg_bot[1] * t)
+            bb = int(bg_top[2] * (1 - t) + bg_bot[2] * t)
             draw.line([(x_start, hy), (x_end, hy)], fill=(rr, gg, bb, 255))
 
     draw = ImageDraw.Draw(img)
@@ -96,14 +95,12 @@ def draw_icon(size: int) -> Image.Image:
 
 
 def _draw_mc_text(draw, cx, y, font_size):
-    """Draw block M and C letters manually."""
     thickness = max(2, font_size // 7)
     w = font_size
     h = font_size
     gap = font_size // 3
     total_w = w * 2 + gap
     mx = cx - total_w // 2
-
     white = (255, 255, 255, 220)
 
     draw.rectangle([mx, y, mx + thickness, y + h], fill=white)
@@ -135,7 +132,6 @@ def save_ico():
     images = []
     for s in sizes:
         images.append(draw_icon(s).convert("RGBA"))
-
     images[-1].save(
         str(out),
         format="ICO",
@@ -148,7 +144,6 @@ def save_ico():
 
 def save_icns():
     out = ASSETS_DIR / "icon.icns"
-
     icon_types = [
         (b"icp4", 16),
         (b"icp5", 32),
@@ -158,7 +153,6 @@ def save_icns():
         (b"ic09", 512),
         (b"ic10", 1024),
     ]
-
     chunks = []
     for ostype, px in icon_types:
         img = draw_icon(min(px, 512))
@@ -167,18 +161,14 @@ def save_icns():
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         png_data = buf.getvalue()
-
         chunk_len = 8 + len(png_data)
         chunks.append(ostype + struct.pack(">I", chunk_len) + png_data)
-
     body = b"".join(chunks)
     total_len = 8 + len(body)
-
     with open(str(out), "wb") as f:
         f.write(b"icns")
         f.write(struct.pack(">I", total_len))
         f.write(body)
-
     print("  [OK] icon.icns (%s)" % ", ".join(str(s) for _, s in icon_types))
     return out
 

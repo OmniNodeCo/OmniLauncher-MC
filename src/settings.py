@@ -24,6 +24,7 @@ DEFAULT_SETTINGS = {
     "close_on_launch": False,
     "show_snapshots": False,
     "auto_update": True,
+    "check_updates_on_start": True,
     "window_width": 1100,
     "window_height": 700,
 }
@@ -32,30 +33,28 @@ DEFAULT_SETTINGS = {
 class SettingsManager:
     """Manages application settings with persistence."""
 
-    def __init__(self):
-        self.filepath = get_app_dir() / "settings.json"
+    def __init__(self, appdata_mgr=None):
+        if appdata_mgr:
+            self.filepath = appdata_mgr.get_file("settings")
+        else:
+            self.filepath = get_app_dir() / "settings.json"
         self.settings = dict(DEFAULT_SETTINGS)
         self.load()
 
-    def load(self) -> None:
-        """Load settings from file."""
+    def load(self):
         saved = load_json(self.filepath)
         self.settings.update(saved)
 
-    def save(self) -> None:
-        """Save current settings to file."""
+    def save(self):
         save_json(self.filepath, self.settings)
 
-    def get(self, key: str, default=None):
-        """Get a setting value."""
+    def get(self, key, default=None):
         return self.settings.get(key, default)
 
-    def set(self, key: str, value) -> None:
-        """Set a setting value and save."""
+    def set(self, key, value):
         self.settings[key] = value
         self.save()
 
-    def reset(self) -> None:
-        """Reset to default settings."""
+    def reset(self):
         self.settings = dict(DEFAULT_SETTINGS)
         self.save()

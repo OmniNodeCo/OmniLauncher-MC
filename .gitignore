@@ -17,12 +17,7 @@ env/
 *~
 .DS_Store
 Thumbs.db
-ehthumbs.db
-*.spec.bak
-*.manifest
-*.exe
-*.app
-*.tar.gz
 assets/icon.png
 assets/icon.ico
 assets/icon.icns
+.pytest_cache/

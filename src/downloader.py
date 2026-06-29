@@ -19,12 +19,11 @@ import minecraft_launcher_lib as mll
 class DownloadManager:
     """Handles downloading and installing Minecraft versions."""
 
-    def __init__(self, minecraft_dir: str):
+    def __init__(self, minecraft_dir):
         self.minecraft_dir = minecraft_dir
         self._cancel = False
 
-    def get_versions(self, include_snapshots: bool = False) -> list:
-        """Get list of available Minecraft versions."""
+    def get_versions(self, include_snapshots=False):
         try:
             versions = mll.utils.get_version_list()
             if not include_snapshots:
@@ -33,45 +32,30 @@ class DownloadManager:
         except Exception:
             return []
 
-    def get_installed_versions(self) -> list:
-        """Get list of locally installed versions."""
+    def get_installed_versions(self):
         try:
             installed = mll.utils.get_installed_versions(self.minecraft_dir)
             return [v["id"] for v in installed]
         except Exception:
             return []
 
-    def is_installed(self, version_id: str) -> bool:
+    def is_installed(self, version_id):
         return version_id in self.get_installed_versions()
 
-    def install_version(
-        self,
-        version_id: str,
-        progress_callback: Optional[Callable] = None,
-        done_callback: Optional[Callable] = None,
-        error_callback: Optional[Callable] = None,
-    ) -> None:
-        """Install a version in a background thread."""
+    def install_version(self, version_id, progress_callback=None,
+                        done_callback=None, error_callback=None):
         self._cancel = False
 
         def _worker():
             try:
                 callback_dict = {}
                 if progress_callback:
-                    callback_dict["setStatus"] = lambda text: progress_callback(
-                        "status", text
-                    )
-                    callback_dict["setProgress"] = lambda val: progress_callback(
-                        "progress", val
-                    )
-                    callback_dict["setMax"] = lambda val: progress_callback(
-                        "max", val
-                    )
-
+                    callback_dict["setStatus"] = lambda text: progress_callback("status", text)
+                    callback_dict["setProgress"] = lambda val: progress_callback("progress", val)
+                    callback_dict["setMax"] = lambda val: progress_callback("max", val)
                 mll.install.install_minecraft_version(
                     version_id, self.minecraft_dir, callback=callback_dict
                 )
-
                 if done_callback:
                     done_callback(version_id)
             except Exception as e:
@@ -81,31 +65,20 @@ class DownloadManager:
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()
 
-    def cancel(self) -> None:
+    def cancel(self):
         self._cancel = True
 
-    def get_launch_command(
-        self,
-        version_id: str,
-        username: str,
-        uuid_str: str,
-        token: str,
-        java_path: str = "java",
-        jvm_args: list = None,
-    ) -> list:
-        """Build the launch command for a Minecraft version."""
+    def get_launch_command(self, version_id, username, uuid_str, token,
+                           java_path="java", jvm_args=None):
         options = mll.types.MinecraftOptions(
             username=username,
             uuid=uuid_str,
             token=token if token else "0",
         )
-
         if jvm_args:
             options.jvmArguments = jvm_args
-
         if java_path:
             options.executablePath = java_path
-
         try:
             command = mll.command.get_minecraft_command(
                 version_id, self.minecraft_dir, options
@@ -114,8 +87,7 @@ class DownloadManager:
         except Exception:
             return []
 
-    def resolve_version(self, version_str: str) -> str:
-        """Resolve 'latest-release' and 'latest-snapshot' to actual versions."""
+    def resolve_version(self, version_str):
         if version_str == "latest-release":
             versions = self.get_versions(include_snapshots=False)
             return versions[0]["id"] if versions else ""

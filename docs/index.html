@@ -3,186 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniLauncher-MC — Modern Minecraft Launcher</title>
+    <title>OmniLauncher-MC - Modern Minecraft Launcher</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Animated background -->
     <div class="bg-grid"></div>
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
-    <div class="bg-glow bg-glow-3"></div>
-
-    <!-- Navigation -->
     <nav class="navbar" id="navbar">
         <div class="nav-container">
-            <a href="#" class="nav-brand">
-                <svg class="nav-icon" viewBox="0 0 512 512" width="32" height="32">
-                    <rect x="32" y="32" width="448" height="448" rx="80" ry="80" fill="url(#navGrad)"/>
-                    <circle cx="256" cy="240" r="80" fill="none" stroke="white" stroke-width="20"/>
-                    <polygon points="236,208 284,240 236,272" fill="white"/>
-                    <text x="256" y="380" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="52" fill="white">MC</text>
-                    <defs>
-                        <linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#6C3BF5"/>
-                            <stop offset="100%" style="stop-color:#3B82F6"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <span>OmniLauncher-MC</span>
-            </a>
-            <div class="nav-links">
+            <a href="#" class="nav-brand"><span class="nav-brand-icon">O</span><span>OmniLauncher-MC</span></a>
+            <div class="nav-links" id="navLinks">
                 <a href="#features">Features</a>
-                <a href="#screenshots">Screenshots</a>
+                <a href="#preview">Preview</a>
                 <a href="#download">Download</a>
-                <a href="https://github.com/OmniNodeCo/OmniLauncher-MC" class="nav-github" target="_blank" rel="noopener">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                    </svg>
-                    GitHub
-                </a>
+                <a href="https://github.com/OmniNodeCo/OmniLauncher-MC" class="nav-github" target="_blank" rel="noopener">GitHub</a>
             </div>
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
-                <span></span><span></span><span></span>
-            </button>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
         </div>
     </nav>
-
-    <!-- Hero Section -->
     <section class="hero" id="hero">
         <div class="hero-container">
-            <div class="hero-badge">
-                <span class="badge-dot"></span>
-                Open Source • Free Forever
-            </div>
-            <h1 class="hero-title">
-                The <span class="gradient-text">Modern</span> Minecraft<br>
-                Launcher You Deserve
-            </h1>
-            <p class="hero-subtitle">
-                Lightning-fast, beautifully designed, and built with Python.
-                No Electron bloat. Just pure performance.
-            </p>
+            <div class="hero-badge"><span class="badge-dot"></span>Open Source - Free Forever</div>
+            <h1 class="hero-title">The <span class="gradient-text">Modern</span> Minecraft<br>Launcher You Deserve</h1>
+            <p class="hero-subtitle">Lightning-fast, beautifully designed, and built with Python. No Electron bloat. Just pure performance.</p>
             <div class="hero-actions">
-                <a href="#download" class="btn btn-primary btn-lg">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                    </svg>
-                    Download Now
-                </a>
-                <a href="https://github.com/OmniNodeCo/OmniLauncher-MC" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">
-                    View on GitHub
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                </a>
+                <a href="#download" class="btn btn-primary btn-lg">Download Now</a>
+                <a href="https://github.com/OmniNodeCo/OmniLauncher-MC" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">View on GitHub</a>
             </div>
             <div class="hero-stats">
-                <div class="stat">
-                    <span class="stat-value">0</span>
-                    <span class="stat-label">Electron</span>
-                </div>
+                <div class="stat"><span class="stat-value">0</span><span class="stat-label">Electron</span></div>
                 <div class="stat-divider"></div>
-                <div class="stat">
-                    <span class="stat-value">~50MB</span>
-                    <span class="stat-label">App Size</span>
-                </div>
+                <div class="stat"><span class="stat-value">~50MB</span><span class="stat-label">App Size</span></div>
                 <div class="stat-divider"></div>
-                <div class="stat">
-                    <span class="stat-value">3</span>
-                    <span class="stat-label">Platforms</span>
-                </div>
+                <div class="stat"><span class="stat-value">3</span><span class="stat-label">Platforms</span></div>
                 <div class="stat-divider"></div>
-                <div class="stat">
-                    <span class="stat-value">MIT</span>
-                    <span class="stat-label">License</span>
-                </div>
+                <div class="stat"><span class="stat-value">MIT</span><span class="stat-label">License</span></div>
             </div>
         </div>
     </section>
-
-    <!-- Features Section -->
     <section class="features" id="features">
         <div class="section-container">
             <div class="section-header">
                 <span class="section-tag">Features</span>
                 <h2 class="section-title">Everything you need,<br>nothing you don't</h2>
-                <p class="section-subtitle">
-                    Built from the ground up for speed, simplicity, and a beautiful experience.
-                </p>
+                <p class="section-subtitle">Built from the ground up for speed, simplicity, and a beautiful experience.</p>
             </div>
             <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Lightning Fast</h3>
-                    <p>Built with Python & CustomTkinter. No Electron, no Chromium, no bloat. Launches in under a second.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3>Beautiful UI</h3>
-                    <p>Modern dark theme with smooth gradients, clean typography, and carefully crafted interactions.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📁</div>
-                    <h3>Profile System</h3>
-                    <p>Create unlimited profiles for different versions, mod loaders, and configurations. Switch instantly.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📦</div>
-                    <h3>Version Manager</h3>
-                    <p>Browse, install, and manage every Minecraft version. From latest release to ancient alpha.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔧</div>
-                    <h3>Fully Configurable</h3>
-                    <p>Custom Java path, JVM arguments, RAM allocation, and more. Full control over your game.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🖥️</div>
-                    <h3>Cross Platform</h3>
-                    <p>Native builds for Windows, macOS, and Linux. Same great experience everywhere.</p>
-                </div>
+                <div class="feature-card"><div class="feature-icon">FAST</div><h3>Lightning Fast</h3><p>Built with Python and CustomTkinter. No Electron, no Chromium, no bloat.</p></div>
+                <div class="feature-card"><div class="feature-icon">UI</div><h3>Beautiful UI</h3><p>Modern dark theme with smooth gradients and clean typography.</p></div>
+                <div class="feature-card"><div class="feature-icon">PROFILES</div><h3>Profile System</h3><p>Create unlimited profiles for different versions and configurations.</p></div>
+                <div class="feature-card"><div class="feature-icon">VERSIONS</div><h3>Version Manager</h3><p>Browse, install, and manage every Minecraft version.</p></div>
+                <div class="feature-card"><div class="feature-icon">UPDATE</div><h3>Auto Updates</h3><p>Automatic update checking with skip and download options.</p></div>
+                <div class="feature-card"><div class="feature-icon">CROSS</div><h3>Cross Platform</h3><p>Native builds for Windows, macOS, and Linux.</p></div>
             </div>
         </div>
     </section>
-
-    <!-- Screenshots Section -->
-    <section class="screenshots" id="screenshots">
+    <section class="screenshots" id="preview">
         <div class="section-container">
             <div class="section-header">
                 <span class="section-tag">Preview</span>
                 <h2 class="section-title">See it in action</h2>
-                <p class="section-subtitle">
-                    A clean, intuitive interface that stays out of your way.
-                </p>
+                <p class="section-subtitle">A clean, intuitive interface that stays out of your way.</p>
             </div>
             <div class="screenshot-showcase">
                 <div class="screenshot-window">
-                    <div class="window-bar">
-                        <div class="window-dots">
-                            <span class="dot red"></span>
-                            <span class="dot yellow"></span>
-                            <span class="dot green"></span>
-                        </div>
-                        <span class="window-title">OmniLauncher-MC</span>
-                    </div>
+                    <div class="window-bar"><div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><span class="window-title">OmniLauncher-MC</span></div>
                     <div class="window-content">
                         <div class="mock-sidebar">
-                            <div class="mock-logo">⬡ OmniLauncher</div>
-                            <div class="mock-nav-item active">🏠 Home</div>
-                            <div class="mock-nav-item">📁 Profiles</div>
-                            <div class="mock-nav-item">📦 Versions</div>
-                            <div class="mock-nav-item">⚙️ Settings</div>
-                            <div class="mock-user">
-                                <span>👤</span>
-                                <div>
-                                    <div class="mock-username">Player</div>
-                                    <div class="mock-mode">Offline Mode</div>
-                                </div>
-                            </div>
+                            <div class="mock-logo">OmniLauncher</div>
+                            <div class="mock-nav-item active">Home</div>
+                            <div class="mock-nav-item">Profiles</div>
+                            <div class="mock-nav-item">Versions</div>
+                            <div class="mock-nav-item">Settings</div>
+                            <div class="mock-user"><div class="mock-username">Player</div><div class="mock-mode">Offline Mode</div></div>
                         </div>
                         <div class="mock-main">
                             <div class="mock-header">Welcome Back!</div>
@@ -190,13 +87,13 @@
                             <div class="mock-launch-card">
                                 <div class="mock-profile-label">Active Profile</div>
                                 <div class="mock-profile-select">Default</div>
-                                <div class="mock-version">Version: 1.21.4 • Vanilla</div>
-                                <div class="mock-launch-btn">▶ Launch Minecraft</div>
+                                <div class="mock-version">Version: 1.21.4 | Vanilla</div>
+                                <div class="mock-launch-btn">Launch Minecraft</div>
                             </div>
                             <div class="mock-stats">
                                 <div class="mock-stat"><span class="val">3</span><span class="lbl">Profiles</span></div>
                                 <div class="mock-stat"><span class="val">5</span><span class="lbl">Installed</span></div>
-                                <div class="mock-stat"><span class="val">Player</span><span class="lbl">Player</span></div>
+                                <div class="mock-stat"><span class="val">2.1 MB</span><span class="lbl">Data</span></div>
                             </div>
                         </div>
                     </div>
@@ -204,103 +101,36 @@
             </div>
         </div>
     </section>
-
-    <!-- Download Section -->
     <section class="download" id="download">
         <div class="section-container">
             <div class="section-header">
                 <span class="section-tag">Download</span>
                 <h2 class="section-title">Get started in seconds</h2>
-                <p class="section-subtitle">
-                    Download for your platform and start playing immediately.
-                </p>
+                <p class="section-subtitle">Download for your platform and start playing immediately.</p>
             </div>
             <div class="download-grid">
-                <div class="download-card">
-                    <div class="dl-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
-                        </svg>
-                    </div>
-                    <h3>Windows</h3>
-                    <p>Windows 10/11 (64-bit)</p>
-                    <a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">
-                        Download .exe
-                    </a>
-                </div>
-                <div class="download-card">
-                    <div class="dl-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.581 19.049c-.55-.446-.336-1.431-.907-2.031-.573-.602-1.493-.58-2.29-1.152-.796-.573-1.13-1.48-1.604-2.256-.474-.777-.93-1.146-.93-1.146s.35.063.926.412c.574.35 1.15.91 1.646 1.404.496.494 1.014 1.19 1.607 1.467.593.277 1.263.13 1.78.55.515.42 1.062 1.212 1.062 1.212s-.49-.283-1.29.54zM12.003 22C6.486 22 2 17.523 2 12.003 2 6.486 6.486 2 12.003 2c5.518 0 9.997 4.486 9.997 10.003 0 2.126-.67 4.1-1.806 5.727-.473-.43-.766-.88-1.2-1.32-.606-.612-1.274-.972-1.274-.972s.246.412.44.916c.197.504.304 1.002.53 1.537.228.535.557.99.557.99-.67.426-1.412.75-2.205.955-.428-.862-.708-1.744-1.177-2.473-.47-.73-1.083-1.365-1.73-1.757-.647-.393-1.354-.618-2.078-.57-.725.05-1.38.36-1.927.855-.546.495-.937 1.12-1.197 1.77-.26.65-.413 1.34-.413 1.34s-.16-.56-.16-1.34c0-.78.16-1.58.505-2.297.346-.717.866-1.34 1.5-1.783.635-.443 1.4-.686 2.173-.686.772 0 1.55.256 2.26.7.71.442 1.344 1.074 1.846 1.767.502.693.865 1.457 1.13 2.175.192.52.33 1.013.43 1.445A9.96 9.96 0 0012.003 22z"/>
-                        </svg>
-                    </div>
-                    <h3>macOS</h3>
-                    <p>macOS 11+ (Universal)</p>
-                    <a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">
-                        Download .zip
-                    </a>
-                </div>
-                <div class="download-card">
-                    <div class="dl-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12.504 0c-.155 0-.311.01-.465.023L12 .025C6.478.14 2.002 4.659 2.002 10.186c0 5.528 4.476 10.002 10.003 10.002 5.525 0 10-4.474 10-10.002 0-5.527-4.475-10.001-10-10.001-.166 0-.332.004-.498.012h.002zM12 2.215c4.404 0 7.974 3.57 7.974 7.971 0 4.403-3.57 7.972-7.974 7.972-4.402 0-7.972-3.57-7.972-7.972 0-4.402 3.57-7.971 7.972-7.971zM8.4 8.4v7.2h2.4v-2.4h2.4v2.4h2.4V8.4h-2.4v2.4h-2.4V8.4z"/>
-                        </svg>
-                    </div>
-                    <h3>Linux</h3>
-                    <p>Ubuntu, Fedora, Arch (64-bit)</p>
-                    <a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">
-                        Download .tar.gz
-                    </a>
-                </div>
+                <div class="download-card"><h3>Windows</h3><p>Windows 10/11 (64-bit)</p><a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">Download .exe</a></div>
+                <div class="download-card"><h3>macOS</h3><p>macOS 11+ (Universal)</p><a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">Download .zip</a></div>
+                <div class="download-card"><h3>Linux</h3><p>Ubuntu, Fedora, Arch (64-bit)</p><a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">Download .tar.gz</a></div>
             </div>
             <div class="alt-install">
                 <h4>Or install from source:</h4>
-                <div class="code-block">
-                    <code>
-                        <span class="code-comment"># Clone the repository</span><br>
-                        git clone https://github.com/OmniNodeCo/OmniLauncher-MC.git<br>
-                        cd OmniLauncher-MC<br><br>
-                        <span class="code-comment"># Install dependencies</span><br>
-                        pip install -r requirements.txt<br><br>
-                        <span class="code-comment"># Run</span><br>
-                        python src/main.py
-                    </code>
-                </div>
+                <div class="code-block"><code>git clone https://github.com/OmniNodeCo/OmniLauncher-MC.git<br>cd OmniLauncher-MC<br>pip install -r requirements.txt<br>python src/main.py</code></div>
             </div>
         </div>
     </section>
-
-    <!-- Footer -->
     <footer class="footer">
         <div class="footer-container">
-            <div class="footer-brand">
-                <svg class="footer-icon" viewBox="0 0 512 512" width="28" height="28">
-                    <rect x="32" y="32" width="448" height="448" rx="80" ry="80" fill="url(#footGrad)"/>
-                    <circle cx="256" cy="240" r="80" fill="none" stroke="white" stroke-width="20"/>
-                    <polygon points="236,208 284,240 236,272" fill="white"/>
-                    <text x="256" y="380" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="52" fill="white">MC</text>
-                    <defs>
-                        <linearGradient id="footGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#6C3BF5"/>
-                            <stop offset="100%" style="stop-color:#3B82F6"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <span>OmniLauncher-MC</span>
-            </div>
+            <div class="footer-brand">OmniLauncher-MC</div>
             <div class="footer-links">
                 <a href="https://github.com/OmniNodeCo/OmniLauncher-MC" target="_blank" rel="noopener">GitHub</a>
                 <a href="https://github.com/OmniNodeCo/OmniLauncher-MC/releases" target="_blank" rel="noopener">Releases</a>
                 <a href="https://github.com/OmniNodeCo/OmniLauncher-MC/issues" target="_blank" rel="noopener">Issues</a>
                 <a href="https://github.com/OmniNodeCo" target="_blank" rel="noopener">OmniNodeCo</a>
             </div>
-            <div class="footer-copy">
-                <p>&copy; 2024 OmniNodeCo. Released under MIT License.</p>
-                <p>Not affiliated with Mojang Studios or Microsoft.</p>
-            </div>
+            <div class="footer-copy"><p>2024 OmniNodeCo. Released under MIT License.</p><p>Not affiliated with Mojang Studios or Microsoft.</p></div>
         </div>
     </footer>
-
     <script src="script.js"></script>
 </body>
 </html>

@@ -9,7 +9,33 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev xvfb
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run all tests
+        run: |
+          cd src && xvfb-run python -m pytest ../tests/ -v
+
   build-windows:
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +64,7 @@ jobs:
           path: dist/OmniLauncher-MC.exe
 
   build-linux:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +104,7 @@ jobs:
           path: dist/OmniLauncher-MC-Linux.tar.gz
 
   build-macos:
+    needs: test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -142,9 +170,6 @@ jobs:
             - **Windows**: `OmniLauncher-MC.exe`
             - **Linux**: `OmniLauncher-MC-Linux.tar.gz`
             - **macOS**: `OmniLauncher-MC-macOS.zip`
-
-            ### What's New
-            See the commit history for changes in this release.
           files: |
             release/OmniLauncher-MC.exe
             release/OmniLauncher-MC-Linux.tar.gz
