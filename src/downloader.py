@@ -1,5 +1,14 @@
 """Download and install Minecraft versions."""
 
+import sys
+import os
+
+_here = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _here = sys._MEIPASS
+if _here not in sys.path:
+    sys.path.insert(0, _here)
+
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -14,7 +23,7 @@ class DownloadManager:
         self.minecraft_dir = minecraft_dir
         self._cancel = False
 
-    def get_versions(self, include_snapshots: bool = False) -> list[dict]:
+    def get_versions(self, include_snapshots: bool = False) -> list:
         """Get list of available Minecraft versions."""
         try:
             versions = mll.utils.get_version_list()
@@ -24,7 +33,7 @@ class DownloadManager:
         except Exception:
             return []
 
-    def get_installed_versions(self) -> list[str]:
+    def get_installed_versions(self) -> list:
         """Get list of locally installed versions."""
         try:
             installed = mll.utils.get_installed_versions(self.minecraft_dir)
@@ -82,8 +91,8 @@ class DownloadManager:
         uuid_str: str,
         token: str,
         java_path: str = "java",
-        jvm_args: list[str] = None,
-    ) -> list[str]:
+        jvm_args: list = None,
+    ) -> list:
         """Build the launch command for a Minecraft version."""
         options = mll.types.MinecraftOptions(
             username=username,

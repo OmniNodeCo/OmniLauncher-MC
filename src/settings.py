@@ -1,5 +1,14 @@
 """Settings management for OmniLauncher-MC."""
 
+import sys
+import os
+
+_here = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _here = sys._MEIPASS
+if _here not in sys.path:
+    sys.path.insert(0, _here)
+
 from pathlib import Path
 from utils import get_app_dir, get_minecraft_dir, load_json, save_json
 

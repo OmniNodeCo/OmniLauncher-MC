@@ -1,5 +1,14 @@
 """Authentication module for OmniLauncher-MC (offline mode)."""
 
+import sys
+import os
+
+_here = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _here = sys._MEIPASS
+if _here not in sys.path:
+    sys.path.insert(0, _here)
+
 import uuid
 from pathlib import Path
 from utils import get_app_dir, load_json, save_json
@@ -36,7 +45,9 @@ class AuthManager:
         """Login with offline / local username."""
         if not username or len(username) < 3 or len(username) > 16:
             return False
-        if not username.isalnum() and "_" not in username:
+
+        clean = username.replace("_", "")
+        if not clean.isalnum():
             return False
 
         self.username = username
@@ -64,4 +75,4 @@ class AuthManager:
 
     @staticmethod
     def _generate_offline_uuid(username: str) -> str:
-        return str(uuid.uuid3(uuid.NAMESPACE_DNS, f"OfflinePlayer:{username}"))
+        return str(uuid.uuid3(uuid.NAMESPACE_DNS, "OfflinePlayer:" + username))

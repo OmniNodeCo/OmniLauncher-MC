@@ -11,7 +11,7 @@ def get_app_dir() -> Path:
     """Get the application data directory."""
     system = platform.system()
     if system == "Windows":
-        base = Path(os.getenv("APPDATA", Path.home()))
+        base = Path(os.getenv("APPDATA", str(Path.home())))
     elif system == "Darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
@@ -26,7 +26,7 @@ def get_minecraft_dir() -> Path:
     """Get the default Minecraft directory."""
     system = platform.system()
     if system == "Windows":
-        return Path(os.getenv("APPDATA", Path.home())) / ".minecraft"
+        return Path(os.getenv("APPDATA", str(Path.home()))) / ".minecraft"
     elif system == "Darwin":
         return Path.home() / "Library" / "Application Support" / "minecraft"
     else:
@@ -35,7 +35,7 @@ def get_minecraft_dir() -> Path:
 
 def get_asset_path(filename: str) -> str:
     """Get the path to a bundled asset file."""
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         base = Path(sys._MEIPASS)
     else:
         base = Path(__file__).parent.parent
@@ -72,7 +72,6 @@ def get_java_executable() -> str:
     """Try to find a Java executable."""
     system = platform.system()
 
-    # Check JAVA_HOME first
     java_home = os.getenv("JAVA_HOME")
     if java_home:
         if system == "Windows":
@@ -82,7 +81,6 @@ def get_java_executable() -> str:
         if java_path.exists():
             return str(java_path)
 
-    # Fallback
     if system == "Windows":
         return "javaw.exe"
     return "java"

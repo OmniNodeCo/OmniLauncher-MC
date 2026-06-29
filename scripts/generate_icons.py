@@ -11,7 +11,6 @@ import struct
 import io
 from pathlib import Path
 
-# Ensure UTF-8 output on Windows
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -36,7 +35,6 @@ def draw_icon(size: int) -> Image.Image:
     bg_color_top = (108, 59, 245, 255)
     bg_color_bot = (59, 130, 246, 255)
 
-    # Gradient background
     for y in range(size):
         t = y / max(size - 1, 1)
         r = int(bg_color_top[0] * (1 - t) + bg_color_bot[0] * t)
@@ -44,7 +42,6 @@ def draw_icon(size: int) -> Image.Image:
         b = int(bg_color_top[2] * (1 - t) + bg_color_bot[2] * t)
         draw.line([(0, y), (size - 1, y)], fill=(r, g, b, 255))
 
-    # Mask to rounded rect
     mask = Image.new("L", (size, size), 0)
     mask_draw = ImageDraw.Draw(mask)
     pad = int(32 * scale)
@@ -56,22 +53,18 @@ def draw_icon(size: int) -> Image.Image:
     )
     img.putalpha(mask)
 
-    # Need fresh draw after putalpha
     draw = ImageDraw.Draw(img)
 
-    # White ring (O symbol)
     cx, cy = size // 2, int(220 * scale)
     r_outer = int(90 * scale)
     stroke = int(22 * scale)
     r_inner = r_outer - stroke
 
-    # Draw white filled circle
     draw.ellipse(
         [cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer],
         fill=(255, 255, 255, 230),
     )
 
-    # Cut out inner hole by redrawing gradient
     for hy in range(max(0, cy - r_inner), min(size, cy + r_inner + 1)):
         dy = hy - cy
         if abs(dy) <= r_inner:
@@ -84,7 +77,8 @@ def draw_icon(size: int) -> Image.Image:
             bb = int(bg_color_top[2] * (1 - t) + bg_color_bot[2] * t)
             draw.line([(x_start, hy), (x_end, hy)], fill=(rr, gg, bb, 255))
 
-    # Play triangle
+    draw = ImageDraw.Draw(img)
+
     tri_cx = cx + int(4 * scale)
     tri_h = int(36 * scale)
     tri_w = int(40 * scale)
@@ -95,15 +89,14 @@ def draw_icon(size: int) -> Image.Image:
     ]
     draw.polygon(pts, fill=(255, 255, 255, 240))
 
-    # MC text as simple block letters
     if size >= 64:
         _draw_mc_text(draw, size // 2, int(350 * scale), int(50 * scale))
 
     return img
 
 
-def _draw_mc_text(draw: ImageDraw.ImageDraw, cx: int, y: int, font_size: int):
-    """Draw block M and C letters."""
+def _draw_mc_text(draw, cx, y, font_size):
+    """Draw block M and C letters manually."""
     thickness = max(2, font_size // 7)
     w = font_size
     h = font_size
@@ -113,30 +106,22 @@ def _draw_mc_text(draw: ImageDraw.ImageDraw, cx: int, y: int, font_size: int):
 
     white = (255, 255, 255, 220)
 
-    # M - left bar
     draw.rectangle([mx, y, mx + thickness, y + h], fill=white)
-    # M - right bar
     draw.rectangle([mx + w - thickness, y, mx + w, y + h], fill=white)
-    # M - top bar
     draw.rectangle([mx, y, mx + w, y + thickness], fill=white)
-    # M - center V (simplified as center bar going down half)
     center_x = mx + w // 2
     draw.rectangle(
         [center_x - thickness // 2, y, center_x + thickness // 2, y + h // 2],
         fill=white,
     )
 
-    # C
     cx2 = mx + w + gap
-    # C - top bar
     draw.rectangle([cx2, y, cx2 + w, y + thickness], fill=white)
-    # C - bottom bar
     draw.rectangle([cx2, y + h - thickness, cx2 + w, y + h], fill=white)
-    # C - left bar
     draw.rectangle([cx2, y, cx2 + thickness, y + h], fill=white)
 
 
-def save_png(size: int = 512) -> Path:
+def save_png(size=512):
     out = ASSETS_DIR / "icon.png"
     img = draw_icon(size)
     img.save(str(out), "PNG")
@@ -144,7 +129,7 @@ def save_png(size: int = 512) -> Path:
     return out
 
 
-def save_ico() -> Path:
+def save_ico():
     out = ASSETS_DIR / "icon.ico"
     sizes = [16, 24, 32, 48, 64, 128, 256]
     images = []
@@ -161,7 +146,7 @@ def save_ico() -> Path:
     return out
 
 
-def save_icns() -> Path:
+def save_icns():
     out = ASSETS_DIR / "icon.icns"
 
     icon_types = [

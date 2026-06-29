@@ -22,13 +22,6 @@ a = Analysis(
     binaries=[],
     datas=[
         ("assets", "assets"),
-        # Bundle all src modules explicitly so imports resolve
-        (os.path.join(src_path, "launcher.py"),  "."),
-        (os.path.join(src_path, "auth.py"),       "."),
-        (os.path.join(src_path, "downloader.py"), "."),
-        (os.path.join(src_path, "profiles.py"),   "."),
-        (os.path.join(src_path, "settings.py"),   "."),
-        (os.path.join(src_path, "utils.py"),      "."),
     ],
     hiddenimports=[
         "customtkinter",
@@ -46,7 +39,6 @@ a = Analysis(
         "charset_normalizer",
         "idna",
         "urllib3",
-        # local modules
         "launcher",
         "auth",
         "downloader",

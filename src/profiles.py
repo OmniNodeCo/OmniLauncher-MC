@@ -1,5 +1,14 @@
 """Profile management for OmniLauncher-MC."""
 
+import sys
+import os
+
+_here = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _here = sys._MEIPASS
+if _here not in sys.path:
+    sys.path.insert(0, _here)
+
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -56,8 +65,8 @@ class ProfileManager:
 
     def __init__(self):
         self.filepath = get_app_dir() / "profiles.json"
-        self.profiles: list[Profile] = []
-        self.active_id: str = ""
+        self.profiles = []
+        self.active_id = ""
         self.load()
 
     def load(self) -> None:
@@ -80,7 +89,7 @@ class ProfileManager:
         }
         save_json(self.filepath, data)
 
-    def get_active(self) -> Profile | None:
+    def get_active(self):
         for p in self.profiles:
             if p.id == self.active_id:
                 return p
@@ -107,10 +116,10 @@ class ProfileManager:
                 break
         self.save()
 
-    def get_names(self) -> list[str]:
+    def get_names(self) -> list:
         return [p.name for p in self.profiles]
 
-    def get_by_name(self, name: str) -> Profile | None:
+    def get_by_name(self, name: str):
         for p in self.profiles:
             if p.name == name:
                 return p

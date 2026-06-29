@@ -3,14 +3,19 @@
 import sys
 import os
 
-# Always add the directory containing main.py to sys.path
-# This works both when run from source and when frozen by PyInstaller
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))
+
+if bundle_dir not in sys.path:
+    sys.path.insert(0, bundle_dir)
 
 
 def main():
     """Launch OmniLauncher-MC."""
     from launcher import OmniLauncher
+
     app = OmniLauncher()
     app.mainloop()
 
