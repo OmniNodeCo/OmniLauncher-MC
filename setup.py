@@ -13,7 +13,7 @@ build_options = {
     ],
     "include_files": [
         "launcher.py",
-        "Changelog.txt"
+        "Changelog.txt",
         "LICENSE.txt",
         "TERMS.txt",
         "settings.json"

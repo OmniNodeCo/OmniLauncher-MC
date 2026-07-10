@@ -2,6 +2,10 @@ name: Build OmniLauncher-MC
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number e.g. v1.0'
+        required: true
 
 jobs:
   build-windows:
@@ -78,3 +82,46 @@ jobs:
         with:
           name: OmniLauncher-MC-Ubuntu
           path: build/
+
+  release:
+    needs: [build-windows, build-macos, build-ubuntu]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: windows-build/
+
+      - name: Download MacOS Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-MacOS
+          path: macos-build/
+
+      - name: Download Ubuntu Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Ubuntu
+          path: ubuntu-build/
+
+      - name: Zip builds
+        run: |
+          cd windows-build && zip -r ../OmniLauncher-MC-Windows.zip . && cd ..
+          cd macos-build && zip -r ../OmniLauncher-MC-MacOS.zip . && cd ..
+          cd ubuntu-build && zip -r ../OmniLauncher-MC-Ubuntu.zip . && cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: OmniLauncher-MC ${{ github.event.inputs.version }}
+          files: |
+            OmniLauncher-MC-Windows.zip
+            OmniLauncher-MC-MacOS.zip
+            OmniLauncher-MC-Ubuntu.zip
