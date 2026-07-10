@@ -10,24 +10,45 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  check-version:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      has_version: ${{ steps.check.outputs.has_version }}
+      version: ${{ steps.read.outputs.VERSION }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Version Info
+      - name: Try download version info
+        id: download
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: version-info
           path: ./
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check if version exists
+        id: check
+        run: |
+          if [ -f "version.txt" ]; then
+            echo "has_version=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_version=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Read version
-        id: version
+        id: read
+        if: steps.check.outputs.has_version == 'true'
         run: echo "VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+
+  release:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-version.outputs.has_version == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Download Windows Build
         uses: actions/download-artifact@v4
@@ -62,8 +83,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: OmniLauncher-MC ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ needs.check-version.outputs.version }}
+          name: OmniLauncher-MC ${{ needs.check-version.outputs.version }}
           files: |
             OmniLauncher-MC-Windows.zip
             OmniLauncher-MC-MacOS.zip

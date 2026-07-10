@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number e.g. v1.0'
-        required: true
+        description: 'Version number e.g. v1.0 (leave empty for build only)'
+        required: false
+        default: ''
 
 jobs:
   build-windows:
@@ -85,6 +86,7 @@ jobs:
 
   save-version:
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.version != '' }}
     steps:
       - name: Save version
         run: echo "${{ github.event.inputs.version }}" > version.txt
