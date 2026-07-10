@@ -17,6 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download Version Info
+        uses: actions/download-artifact@v4
+        with:
+          name: version-info
+          path: ./
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read version
+        id: version
+        run: echo "VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+
       - name: Download Windows Build
         uses: actions/download-artifact@v4
         with:
@@ -50,8 +62,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.workflow_run.head_branch }}
-          name: OmniLauncher-MC ${{ github.event.workflow_run.head_branch }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: OmniLauncher-MC ${{ steps.version.outputs.VERSION }}
           files: |
             OmniLauncher-MC-Windows.zip
             OmniLauncher-MC-MacOS.zip
