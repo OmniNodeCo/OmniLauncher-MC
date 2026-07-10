@@ -1,8 +1,9 @@
+import shutil
 import tkinter
 from tkinter import ttk
 from tkinter.messagebox import askquestion
 
-from launcher import get_latest_version, get_release_versions
+from launcher import get_latest_version, get_release_versions, launch
 
 #------ROOT------#
 root = tkinter.Tk()
@@ -67,15 +68,25 @@ def open_license():
         text_box.insert("1.0", content)
         text_box.config(state="disabled")
 
+def delalldata():
+    answer = askquestion("Are you sure you want to delete all data?")
+    if answer == "yes":
+        shutil.rmtree("%AppData%/.minecraft")
+    else:
+        pass
 
 
 #Launcher Tab config
+tkinter.Button(Launcher_tab, text="Launch", command=launch).grid(row=4, column=0)
 tkinter.Button(Launcher_tab, text="Quit", command=ask_quit).grid(row=5, column=0)
 
 #About Tab Config
 tkinter.Button(About_tab, text="Open Changelog", command=open_changelog).grid(row=5, column=0)
 tkinter.Button(About_tab, text="Open Terms", command=open_terms).grid(row=6, column=0)
 tkinter.Button(About_tab, text="Open License", command=open_license).grid(row=7, column=0)
+
+#Settings Tab Config
+tkinter.Button(Settings_tab, text="Delete ALL Data", bg="red", command=delalldata).grid(row=1, column=5)
 
 #Combobox
 selected_version = tkinter.StringVar()

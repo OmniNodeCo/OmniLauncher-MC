@@ -2,11 +2,6 @@ name: Build OmniLauncher-MC
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version number e.g. v1.0 (leave empty for build only)'
-        required: false
-        default: ''
 
 jobs:
   build-windows:
@@ -83,16 +78,3 @@ jobs:
         with:
           name: OmniLauncher-MC-Ubuntu
           path: build/
-
-  save-version:
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.version != '' }}
-    steps:
-      - name: Save version
-        run: echo "${{ github.event.inputs.version }}" > version.txt
-
-      - name: Upload version
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-info
-          path: version.txt

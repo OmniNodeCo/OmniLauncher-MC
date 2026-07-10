@@ -1,78 +1,113 @@
 name: Release OmniLauncher-MC
 
 on:
-  workflow_run:
-    workflows: ["Build OmniLauncher-MC"]
-    types:
-      - completed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number e.g. v1.0'
+        required: true
 
 permissions:
   contents: write
 
 jobs:
-  check-version:
-    runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      has_version: ${{ steps.check.outputs.has_version }}
-      version: ${{ steps.read.outputs.VERSION }}
-
-    steps:
-      - name: Try download version info
-        id: download
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: version-info
-          path: ./
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check if version exists
-        id: check
-        run: |
-          if [ -f "version.txt" ]; then
-            echo "has_version=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_version=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Read version
-        id: read
-        if: steps.check.outputs.has_version == 'true'
-        run: echo "VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
-
-  release:
-    needs: check-version
-    runs-on: ubuntu-latest
-    if: ${{ needs.check-version.outputs.has_version == 'true' }}
-
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: build/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-MacOS
+          path: build/
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Ubuntu
+          path: build/
+
+  release:
+    needs: [build-windows, build-macos, build-ubuntu]
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Download Windows Build
         uses: actions/download-artifact@v4
         with:
           name: OmniLauncher-MC-Windows
           path: windows-build/
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download MacOS Build
         uses: actions/download-artifact@v4
         with:
           name: OmniLauncher-MC-MacOS
           path: macos-build/
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Ubuntu Build
         uses: actions/download-artifact@v4
         with:
           name: OmniLauncher-MC-Ubuntu
           path: ubuntu-build/
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Zip builds
         run: |
@@ -83,8 +118,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.check-version.outputs.version }}
-          name: OmniLauncher-MC ${{ needs.check-version.outputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
+          name: OmniLauncher-MC ${{ github.event.inputs.version }}
           files: |
             OmniLauncher-MC-Windows.zip
             OmniLauncher-MC-MacOS.zip

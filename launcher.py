@@ -22,12 +22,17 @@ def install_version(version):
         get_minecraft_dir()
     )
 
-def launch_game(username, version):
-    options = {
-        "username": username,
-        "uuid": "",
-        "token": ""
-    }
+def launch():
+    username = username_entry.get()
+    version = version_combobox.get()
+
+    # Run in thread so UI doesnt freeze
+    thread = threading.Thread(target=run_game, args=(username, version))
+    thread.start()
+
+def run_game(username, version):
+    install_version(version)
+    launch_game(username, version)
 
     command = minecraft_launcher_lib.command.get_minecraft_command(
         version,
