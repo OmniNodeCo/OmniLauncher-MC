@@ -1,0 +1,5 @@
+---Official Changelog for OmniLauncher-MC---
+
+- 1.0.0
+- Beta GUI
+- Minecraft Launching Feature

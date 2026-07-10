@@ -1,0 +1,58 @@
+name: Release OmniLauncher-MC
+
+on:
+  workflow_run:
+    workflows: ["Build OmniLauncher-MC"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: windows-build/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download MacOS Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-MacOS
+          path: macos-build/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Ubuntu Build
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Ubuntu
+          path: ubuntu-build/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zip builds
+        run: |
+          cd windows-build && zip -r ../OmniLauncher-MC-Windows.zip . && cd ..
+          cd macos-build && zip -r ../OmniLauncher-MC-MacOS.zip . && cd ..
+          cd ubuntu-build && zip -r ../OmniLauncher-MC-Ubuntu.zip . && cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.workflow_run.head_branch }}
+          name: OmniLauncher-MC ${{ github.event.workflow_run.head_branch }}
+          files: |
+            OmniLauncher-MC-Windows.zip
+            OmniLauncher-MC-MacOS.zip
+            OmniLauncher-MC-Ubuntu.zip

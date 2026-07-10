@@ -1,0 +1,38 @@
+OmniLauncher-MC Terms of Use
+Copyright (c) 2026 OmniNodeCo
+Last Updated: 2026
+
+By using OmniLauncher-MC, you agree to the following terms:
+
+1. ACCEPTANCE
+By downloading or using OmniLauncher-MC, you agree to these terms.
+If you do not agree, do not use the software.
+
+2. USE
+OmniLauncher-MC is a third-party launcher for Minecraft.
+It is not affiliated with or endorsed by Mojang Studios or Microsoft.
+You must own a valid copy of Minecraft to use this launcher.
+
+3. ACCOUNTS
+You are responsible for your own Minecraft account.
+OmniNodeCo is not responsible for any account issues.
+Do not share your login information.
+
+4. NO WARRANTY
+OmniLauncher-MC is provided "as is" without warranty of any kind.
+OmniNodeCo is not responsible for any damage to your system or data.
+
+5. MODIFICATIONS
+OmniNodeCo may update these terms at any time.
+Continued use of the software means you accept the updated terms.
+
+6. THIRD PARTY
+Minecraft is a trademark of Mojang Studios.
+OmniLauncher-MC uses third-party libraries.
+OmniNodeCo does not claim ownership of Minecraft or its assets.
+
+7. TERMINATION
+OmniNodeCo reserves the right to stop development at any time.
+
+8. CONTACT
+For questions, contact OmniNodeCo through GitHub.

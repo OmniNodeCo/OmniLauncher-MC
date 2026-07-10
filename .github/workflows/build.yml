@@ -1,0 +1,82 @@
+name: Build OmniLauncher-MC
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows
+          path: build/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-MacOS
+          path: build/
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cx_Freeze
+          pip install minecraft-launcher-lib
+          pip install customtkinter
+
+      - name: Build
+        run: python setup.py build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Ubuntu
+          path: build/
