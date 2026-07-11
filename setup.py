@@ -1,7 +1,6 @@
 import sys
 
 from cx_Freeze import setup, Executable
-import os
 
 build_options = {
     "packages": [
@@ -10,9 +9,12 @@ build_options = {
         "json",
         "os",
         "subprocess",
+        "threading",
+        "shutil",
+
     ],
     "include_files": [
-        "launcher.py",
+        "scripts/launcher.py",
         "Changelog.txt",
         "LICENSE.txt",
         "TERMS.txt",

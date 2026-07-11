@@ -1,6 +1,8 @@
-import minecraft_launcher_lib
 import subprocess
-import tkinter
+import threading
+
+import minecraft_launcher_lib
+
 
 def get_minecraft_dir():
     return minecraft_launcher_lib.utils.get_minecraft_directory()
@@ -22,22 +24,23 @@ def install_version(version):
         get_minecraft_dir()
     )
 
-def launch():
-    username = username_entry.get()
-    version = version_combobox.get()
+def launch(username, version, ram):
+    thread = threading.Thread(target=run_game, args=(username, version, ram))
 
-    # Run in thread so UI doesnt freeze
-    thread = threading.Thread(target=run_game, args=(username, version))
     thread.start()
 
-def run_game(username, version):
+def run_game(username, version, ram):
     install_version(version)
-    launch_game(username, version)
+    options = {
+        "username": username,
+        "jvmArguments": [f"-Xmx{ram}G", f"-Xms{ram}G"]
+    }
 
     command = minecraft_launcher_lib.command.get_minecraft_command(
         version,
         get_minecraft_dir(),
         options
     )
+
 
     subprocess.Popen(command)

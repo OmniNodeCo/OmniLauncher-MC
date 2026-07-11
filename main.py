@@ -1,9 +1,13 @@
+import json
+import os
 import shutil
 import tkinter
 from tkinter import ttk
 from tkinter.messagebox import askquestion
 
-from launcher import get_latest_version, get_release_versions, launch
+import minecraft_launcher_lib
+
+from scripts.launcher import get_latest_version, get_release_versions, launch
 
 #------ROOT------#
 root = tkinter.Tk()
@@ -25,6 +29,8 @@ notebook.add(About_tab, text="About")
 notebook.add(Settings_tab, text="Settings")
 
 
+
+
 #Functions
 def ask_quit():
     answer = askquestion("Message from OmniLauncher", "Are you sure you want to quit?")
@@ -33,60 +39,91 @@ def ask_quit():
     else:
         pass
 
-def open_changelog():
+def open_text_file(title, filename):
     TopLevelWindow = tkinter.Toplevel()
-    TopLevelWindow.title("Changelog")
+    TopLevelWindow.title(title)
     TopLevelWindow.geometry("500x400")
     text_box = tkinter.Text(TopLevelWindow, wrap="word")
     text_box.pack(fill="both", expand=True)
-    with open("Changelog.txt", "r", encoding="utf-8") as file:
-        content = file.read()
-        text_box.insert("1.0", content)
-        text_box.config(state="disabled")
-
-
-def open_terms():
-    TopLevelWindow = tkinter.Toplevel()
-    TopLevelWindow.title("Terms")
-    TopLevelWindow.geometry("500x400")
-    text_box = tkinter.Text(TopLevelWindow, wrap="word")
-    text_box.pack(fill="both", expand=True)
-    with open("TERMS.txt", "r", encoding="utf-8") as file:
-        content = file.read()
-        text_box.insert("1.0", content)
-        text_box.config(state="disabled")
-
-
-def open_license():
-    TopLevelWindow = tkinter.Toplevel()
-    TopLevelWindow.title("License")
-    TopLevelWindow.geometry("500x400")
-    text_box = tkinter.Text(TopLevelWindow, wrap="word")
-    text_box.pack(fill="both", expand=True)
-    with open("LICENSE.txt", "r", encoding="utf-8") as file:
+    with open(filename, "r", encoding="utf-8") as file:
         content = file.read()
         text_box.insert("1.0", content)
         text_box.config(state="disabled")
 
 def delalldata():
-    answer = askquestion("Are you sure you want to delete all data?")
+    answer = askquestion("Warning", "Are you sure you want to delete all data?")
     if answer == "yes":
-        shutil.rmtree("%AppData%/.minecraft")
+        shutil.rmtree(minecraft_launcher_lib.utils.get_minecraft_directory())
     else:
         pass
 
+def load_settings():
+    if os.path.exists("settings.json"):
+        with open("settings.json", "r") as file:
+            return json.load(file)
+    else:
+        return {
+            "username": "Steve",
+            "ram": 4,
+            "java_path": "",
+            "last_version": ""
+        }
+
+def save_settings():
+    settings = {
+        "username": username_entry.get(),
+        "ram": ram_slider.get(),
+        "java_path": java_entry.get(),
+        "last_version": version_combobox.get()
+    }
+    with open("settings.json", "w") as file:
+        json.dump(settings, file, indent=4)
+
+def on_launch_clicked():
+    username = username_entry.get()
+    version = selected_version.get()
+    ram = ram_slider.get()
+    launch(username, version, ram)
+    
+
+username_entry = tkinter.StringVar()
+
+settings = load_settings()
+
+username_entry.set(settings["username"])
 
 #Launcher Tab config
-tkinter.Button(Launcher_tab, text="Launch", command=launch).grid(row=4, column=0)
-tkinter.Button(Launcher_tab, text="Quit", command=ask_quit).grid(row=5, column=0)
+tkinter.Button(Launcher_tab, text="Launch", command=on_launch_clicked).grid(row=0, column=0)
+tkinter.Button(Launcher_tab, text="Quit", command=ask_quit).grid(row=1, column=0)
+
+#UserName Entry
+
+tkinter.Label(Launcher_tab, text="UserName").grid(row=2, column=0)
+tkinter.Entry(Launcher_tab, textvariable=username_entry).grid(row=3, column=0)
+
 
 #About Tab Config
-tkinter.Button(About_tab, text="Open Changelog", command=open_changelog).grid(row=5, column=0)
-tkinter.Button(About_tab, text="Open Terms", command=open_terms).grid(row=6, column=0)
-tkinter.Button(About_tab, text="Open License", command=open_license).grid(row=7, column=0)
+tkinter.Button(About_tab, text="Open Changelog", command=lambda:open_text_file("Changelog", "Changelog.txt")).grid(row=5, column=0)
+tkinter.Button(About_tab, text="Open Terms", command=lambda:open_text_file("Terms", "TERMS.txt")).grid(row=6, column=0)
+tkinter.Button(About_tab, text="Open License", command=lambda:open_text_file("License", "LICENSE.txt")).grid(row=7, column=0)
 
 #Settings Tab Config
-tkinter.Button(Settings_tab, text="Delete ALL Data", bg="red", command=delalldata).grid(row=1, column=5)
+
+tkinter.Button(Settings_tab, text="Delete ALL Data", bg="red", command=delalldata).grid(row=3, column=5)
+
+#RAM Slider
+
+tkinter.Label(Settings_tab, text="RAM (GB)").grid(row=0, column=0)
+ram_slider = tkinter.Scale(Settings_tab, from_=1, to=16, orient="horizontal")
+ram_slider.set(settings["ram"])
+ram_slider.grid(row=0, column=1)
+
+#Java Entry
+
+tkinter.Label(Settings_tab, text="Java Path").grid(row=1, column=0)
+java_entry = tkinter.Entry(Settings_tab)
+java_entry.grid(row=1, column=1)
+java_entry.insert(0, settings["java_path"])
 
 #Combobox
 selected_version = tkinter.StringVar()
@@ -104,3 +141,4 @@ version_combobox.grid(row=6, column=0)
 
 #Loop
 root.mainloop()
+save_settings()

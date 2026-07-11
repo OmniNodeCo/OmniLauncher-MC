@@ -1,2 +1,3 @@
 customtkinter
 minecraft_launcher_lib
+cx-freeze
