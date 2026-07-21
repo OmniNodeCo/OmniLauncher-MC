@@ -3,3 +3,6 @@
 - 1.0.0
 - Beta GUI
 - Minecraft Launching Feature
+
+- 1.0.1
+- Added Error traceback handler

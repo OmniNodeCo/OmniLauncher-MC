@@ -11,6 +11,9 @@ build_options = {
         "subprocess",
         "threading",
         "shutil",
+        "uuid",
+        "traceback",
+        "datetime",
 
     ],
     "include_files": [
@@ -18,7 +21,8 @@ build_options = {
         "Changelog.txt",
         "LICENSE.txt",
         "TERMS.txt",
-        "settings.json"
+        "settings.json",
+        "scripts/error_handler.py"
     ]
 }
 
@@ -26,7 +30,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 
 setup(
     name="OmniLauncher-MC",
-    version="1.0.0",
+    version="1.0.1",
     options={"build_exe": build_options},
     executables=[
         Executable(
