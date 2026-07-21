@@ -8,7 +8,7 @@ from tkinter import ttk
 from tkinter.messagebox import askquestion
 import minecraft_launcher_lib
 from scripts.launcher import get_latest_version, get_release_versions, launch
-
+import tkinter.messagebox
 
 #------ROOT------#
 root = tkinter.Tk()
@@ -36,7 +36,7 @@ notebook.add(Settings_tab, text="Settings")
 def ask_quit():
     answer = askquestion("Message from OmniLauncher", "Are you sure you want to quit?")
     if answer == "yes":
-        root.destroy()
+        on_closing()
     else:
         pass
 
@@ -57,6 +57,7 @@ def delalldata():
         shutil.rmtree(minecraft_launcher_lib.utils.get_minecraft_directory())
     else:
         pass
+
 
 def load_settings():
     if os.path.exists("settings.json"):
@@ -85,13 +86,63 @@ def on_launch_clicked():
     version = selected_version.get()
     ram = ram_slider.get()
     launch(username, version, ram)
+
+
+#Error Log Section
+
+tkinter.Label(Settings_tab, text="Error Log").grid(row=4, column=0)
+
+
+error_log_text = tkinter.Text(Settings_tab, height=10, width=40, wrap="word")
+error_log_text.grid(row=5, column=0, columnspan=2, padx=10, pady=5)
+error_log_text.config(state="disabled")
+
+
+def refresh_error_log():
+    error_log_text.config(state="normal")
+    error_log_text.delete("1.0", "end")  # Research: "1.0" and "end"
+    
+    if os.path.exists("launcher.log"):
+        with open("launcher.log", "r") as file:  # What file to open?
+            content = file.read()
+            error_log_text.insert("1.0", content)  # Where to insert?
+    else:
+        error_log_text.insert("1.0", "No errors logged.")
+    
+    error_log_text.config(state="disabled")
+
+
+
+def copy_error_log():
+    content = error_log_text.get("1.0", "end")  # Research: "1.0" and "end"
+    root.clipboard_clear()
+    root.clipboard_append(content)  # What to append?
+    tkinter.messagebox.showinfo("Copied", "Error log copied to clipboard.")
+
+
+
+def clear_error_log():
+    answer = askquestion("Warning", "Clear all error logs?")
+    if answer == "yes":
+        with open("launcher.log", "w") as file:  # Research: "w" to overwrite
+            file.write("")
+        refresh_error_log  # What function refreshes the display?
+
+
+
+def on_closing():
+    save_settings()    
+    root.destroy()     
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
     
 
+
 username_entry = tkinter.StringVar()
-
 settings = load_settings()
-
 username_entry.set(settings["username"])
+
+
 
 #Launcher Tab config
 tkinter.Button(Launcher_tab, text="Launch", command=on_launch_clicked).grid(row=0, column=0)
@@ -108,9 +159,28 @@ tkinter.Button(About_tab, text="Open Changelog", command=lambda:open_text_file("
 tkinter.Button(About_tab, text="Open Terms", command=lambda:open_text_file("Terms", "TERMS.txt")).grid(row=6, column=0)
 tkinter.Button(About_tab, text="Open License", command=lambda:open_text_file("License", "LICENSE.txt")).grid(row=7, column=0)
 
+
+
 #Settings Tab Config
 
 tkinter.Button(Settings_tab, text="Delete ALL Data", bg="red", command=delalldata).grid(row=3, column=5)
+
+
+#Error Log Section
+
+tkinter.Label(Settings_tab, text="Error Log").grid(row=4, column=0)
+
+
+error_log_text = tkinter.Text(Settings_tab, height=10, width=40, wrap="word")
+error_log_text.grid(row=5, column=0, columnspan=2, padx=10, pady=5)
+error_log_text.config(state="disabled")
+
+
+tkinter.Button(Settings_tab, text="Refresh", command=refresh_error_log).grid(row=6, column=0, sticky="e", padx=5)
+tkinter.Button(Settings_tab, text="Copy", command=copy_error_log).grid(row=6, column=1, sticky="w", padx=5)
+tkinter.Button(Settings_tab, text="Clear Log", command=clear_error_log).grid(row=6, column=2, sticky="w", padx=5)
+
+
 
 #RAM Slider
 
@@ -118,6 +188,9 @@ tkinter.Label(Settings_tab, text="RAM (GB)").grid(row=0, column=0)
 ram_slider = tkinter.Scale(Settings_tab, from_=1, to=16, orient="horizontal")
 ram_slider.set(settings["ram"])
 ram_slider.grid(row=0, column=1)
+
+
+
 
 #Java Entry
 
@@ -139,14 +212,6 @@ version_combobox = ttk.Combobox(
 version_combobox.set(get_latest_version())
 version_combobox.grid(row=6, column=0)
 
-
-from scripts.error_handler import handle_error
-try:
-    x = 1 / 0  # This will cause an error
-except Exception as e:
-    handle_error(e)
-
-
 #Loop
 root.mainloop()
-save_settings()
+
