@@ -1,0 +1,99 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnilauncher-mc"
+version = "0.1.0"
+description = "A modern Minecraft launcher built with Python"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "OmniLauncher Contributors"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment",
+]
+dependencies = [
+    "minecraft-launcher-lib>=2.0",
+]
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.8",
+    "setuptools>=61.0",
+]
+
+[project.scripts]
+omnilauncher = "omnilauncher.gui:main"
+
+[project.urls]
+Homepage = "https://github.com/OmniNodeCo/OmniLauncher-MC"
+Repository = "https://github.com/OmniNodeCo/OmniLauncher-MC"
+Issues = "https://github.com/OmniNodeCo/OmniLauncher-MC/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["omnilauncher*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.12",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pyright>=1.1",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "W", "C90", "ANN", "T20", "PT", "PTH", "ERA", "PL", "TRY", "SIM", "RET", "ARG"]
+ignore = ["ANN101", "ANN102", "ANN103", "T201", "T203", "PTH123"]
+preview = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src/omnilauncher"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

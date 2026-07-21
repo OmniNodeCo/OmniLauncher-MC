@@ -1,3 +1,26 @@
 .venv
 .idea
 launcher.log
+
+logs/
+settings.json
+uv.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Build
+*.spec
+*.exe
+*.msi
