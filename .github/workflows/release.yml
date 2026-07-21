@@ -22,13 +22,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Install uv
         run: pip install uv
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --extra build
 
       - name: Build with PyInstaller
         run: uv run --with pyinstaller python build.py
@@ -47,13 +47,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Install uv
         run: pip install uv
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --extra build
 
       - name: Build with PyInstaller
         run: uv run --with pyinstaller python build.py
@@ -72,13 +72,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Install uv
         run: pip install uv
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --extra build
 
       - name: Build with PyInstaller
         run: uv run --with pyinstaller python build.py
