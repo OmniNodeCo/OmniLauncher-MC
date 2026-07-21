@@ -5,8 +5,28 @@ Usage:
     uv sync --group build && python build.py
 """
 
+import os
+import shutil
+import stat
 import subprocess
 import sys
+
+
+def _clean_dir(path: str) -> None:
+    """Remove a directory tree, handling read-only files on Windows."""
+    if not os.path.exists(path):
+        return
+    for root, dirs, files in os.walk(path):
+        for name in files + dirs:
+            entry = os.path.join(root, name)
+            try:
+                os.chmod(entry, stat.S_IWRITE)
+            except OSError:
+                pass
+    shutil.rmtree(path, ignore_errors=True)
+    # Retry if rmtree failed (e.g. file still locked)
+    if os.path.exists(path):
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def build() -> None:
@@ -17,6 +37,14 @@ def build() -> None:
 
     console_flag = "--noconsole" if sys.platform == "win32" else "--console"
 
+    _clean_dir("dist")
+    _clean_dir("build")
+
+    # Remove stale .spec file to force regeneration
+    spec_file = "OmniLauncher-MC.spec"
+    if os.path.exists(spec_file):
+        os.remove(spec_file)
+
     cmd = [
         sys.executable,
         "-m",
@@ -26,7 +54,6 @@ def build() -> None:
         "--name",
         "OmniLauncher-MC",
         console_flag,
-        "--clean",
         "--noconfirm",
         *add_data,
     ]
