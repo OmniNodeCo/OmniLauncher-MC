@@ -14,7 +14,7 @@ def handle_error(exception):
     error_type = type(exception).__name__
     
     # Step 4 — Get full traceback
-    full_details = traceback.fromat_exec()  # Research: traceback.format_exc()
+    full_details = traceback.format_exec()  # Research: traceback.format_exc()
     
     # Step 5 — Build log entry
     log_entry = f"""
