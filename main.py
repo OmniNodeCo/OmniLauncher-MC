@@ -1,16 +1,14 @@
-import customtkinter
+#-------IMPORTS-------#
+
+import tkinter
 import json
 import os
 import shutil
-import tkinter
 from tkinter import ttk
 from tkinter.messagebox import askquestion
-
-#------ROOT------#
-=======
 import minecraft_launcher_lib
-
 from scripts.launcher import get_latest_version, get_release_versions, launch
+
 
 #------ROOT------#
 root = tkinter.Tk()
@@ -142,8 +140,13 @@ version_combobox.set(get_latest_version())
 version_combobox.grid(row=6, column=0)
 
 
+from scripts.error_handler import handle_error
+try:
+    x = 1 / 0  # This will cause an error
+except Exception as e:
+    handle_error(e)
+
+
 #Loop
 root.mainloop()
 save_settings()
-
->>>>>>> ad8ce231b17dc23a18494ca227744469e4dfa7c4
