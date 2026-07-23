@@ -73,8 +73,8 @@ Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: 
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandirs; Name: "{app}\launcher.log"
-Type: filesandirs; Name: "{app}\settings.json"
+Type: files; Name: "{app}\launcher.log"
+Type: files; Name: "{app}\settings.json"
 
 [Code]
 procedure InitializeWizard;
