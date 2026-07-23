@@ -24,3 +24,19 @@ build/
 *.spec
 *.exe
 *.msi
+
+# Generated assets
+assets/
+icon-*.png
+installer-banner.png
+installer-logo.png
+
+# Build output
+dist/
+build/
+installer-output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
