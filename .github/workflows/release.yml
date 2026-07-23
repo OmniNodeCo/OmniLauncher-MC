@@ -30,8 +30,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra build
 
-      - name: Install conversion dependencies
-        run: pip install cairosvg pillow
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Install Inkscape
+        run: choco install inkscape -y
 
       - name: Convert all assets
         run: python convert_assets.py
