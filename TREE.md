@@ -17,8 +17,10 @@
 ├── TREE.md
 ├── build.py
 ├── icon.svg
+├── installer-banner.svg
+├── installer-logo.svg
 ├── installer.iss
 ├── main.py
 └── pyproject.toml
 
-6 directories, 16 files
+6 directories, 18 files
