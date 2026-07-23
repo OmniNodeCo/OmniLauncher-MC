@@ -1,5 +1,4 @@
 ; OmniLauncher-MC Installer Script
-; Customized Inno Setup
 
 #define MyAppName "OmniLauncher-MC"
 #define MyAppVersion "0.1.1"
@@ -26,25 +25,20 @@ WizardStyle=modern
 WizardSizePercent=120,120
 DisableWelcomePage=no
 
-; Visual customization
 WindowVisible=yes
 WindowShowCaption=yes
 WindowResizable=no
 
-; Colors
 WizardImageBackColor=$1a1a2e
 SetupIconFile=assets\icon.ico
 WizardImageFile=assets\installer-banner.bmp
 WizardSmallImageFile=assets\installer-logo.bmp
 
-; Minimum OS
 MinVersion=10.0
 
-; Privileges
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
-; Uninstaller
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 
@@ -62,7 +56,7 @@ Name: "desktopicon"; Description: "Create a Desktop shortcut"; GroupDescription:
 Name: "startmenu"; Description: "Create a Start Menu shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
 
 [Files]
-Source: "dist\OmniLauncher-MC\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\OmniLauncher-MC.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenu
