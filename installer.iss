@@ -6,10 +6,9 @@
 #define MyAppPublisher "OmniNodeCo"
 #define MyAppURL "https://github.com/OmniNodeCo/OmniLauncher-MC"
 #define MyAppExeName "OmniLauncher-MC.exe"
-#define AppId a41a5585-b9c3-4d95-b6f5-0266cf90d6de
 
 [Setup]
-AppId={{YOUR-UNIQUE-GUID-HERE}}
+AppId={{a41a5585-b9c3-4d95-b6f5-0266cf90d6de}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -78,57 +77,39 @@ Type: filesandirs; Name: "{app}\launcher.log"
 Type: filesandirs; Name: "{app}\settings.json"
 
 [Code]
-// Custom colors for the installer wizard
 procedure InitializeWizard;
 begin
-  // Dark background
   WizardForm.Color := $1a1a2e;
-
-  // Main panel
   WizardForm.MainPanel.Color := $16213e;
-
-  // Inner page
   WizardForm.InnerPage.Color := $1a1a2e;
-
-  // Welcome page
   WizardForm.WelcomePage.Color := $1a1a2e;
-
-  // Finished page
   WizardForm.FinishedPage.Color := $1a1a2e;
 
-  // Header label
   WizardForm.PageNameLabel.Font.Color := $e94560;
   WizardForm.PageNameLabel.Font.Size := 14;
   WizardForm.PageNameLabel.Font.Style := [fsBold];
 
-  // Description label
   WizardForm.PageDescriptionLabel.Font.Color := $c4c4c4;
 
-  // Welcome labels
   WizardForm.WelcomeLabel1.Font.Color := $e94560;
   WizardForm.WelcomeLabel1.Font.Size := 16;
   WizardForm.WelcomeLabel1.Font.Style := [fsBold];
   WizardForm.WelcomeLabel2.Font.Color := $c4c4c4;
 
-  // Finished labels
   WizardForm.FinishedHeadingLabel.Font.Color := $e94560;
   WizardForm.FinishedHeadingLabel.Font.Size := 16;
   WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
   WizardForm.FinishedLabel.Font.Color := $c4c4c4;
 
-  // Buttons
   WizardForm.NextButton.Font.Color := $ffffff;
   WizardForm.BackButton.Font.Color := $ffffff;
   WizardForm.CancelButton.Font.Color := $ffffff;
 
-  // Directory edit
   WizardForm.DirEdit.Color := $0f3460;
   WizardForm.DirEdit.Font.Color := $ffffff;
 
-  // Components list
   WizardForm.TasksList.Color := $0f3460;
   WizardForm.TasksList.Font.Color := $ffffff;
 
-  // Progress bar color
   WizardForm.ProgressGauge.BackColor := $0f3460;
 end;
