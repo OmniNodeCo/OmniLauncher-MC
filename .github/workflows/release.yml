@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
       - name: Install uv
         run: pip install uv
@@ -33,11 +33,23 @@ jobs:
       - name: Build with PyInstaller
         run: uv run --with pyinstaller python build.py
 
-      - name: Upload artifact
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Installer
+        run: iscc installer.iss
+
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: OmniLauncher-MC-Windows
           path: dist/
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows-Installer
+          path: installer-output/
 
   build-macos:
     runs-on: macos-latest
@@ -47,7 +59,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
       - name: Install uv
         run: pip install uv
@@ -72,7 +84,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
       - name: Install uv
         run: pip install uv
@@ -99,6 +111,12 @@ jobs:
         with:
           name: OmniLauncher-MC-Windows
           path: windows-build/
+
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniLauncher-MC-Windows-Installer
+          path: windows-installer/
 
       - name: Download MacOS Build
         uses: actions/download-artifact@v4
@@ -127,3 +145,4 @@ jobs:
             OmniLauncher-MC-Windows.zip
             OmniLauncher-MC-MacOS.zip
             OmniLauncher-MC-Ubuntu.zip
+            windows-installer/OmniLauncher-MC-Setup.exe
