@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="40%" stop-color="#16213e"/>
+      <stop offset="100%" stop-color="#0f3460"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e94560"/>
+      <stop offset="100%" stop-color="#ff6b6b"/>
+    </linearGradient>
+    <linearGradient id="shineGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="164" height="314" fill="url(#bgGrad)"/>
+
+  <!-- Shine overlay left strip -->
+  <rect width="164" height="314" fill="url(#shineGrad)"/>
+
+  <!-- Top decorative bar -->
+  <rect width="164" height="4" fill="url(#accentGrad)"/>
+
+  <!-- Grid lines decorative background -->
+  <line x1="0" y1="60" x2="164" y2="60" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+  <line x1="0" y1="90" x2="164" y2="90" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+  <line x1="0" y1="120" x2="164" y2="120" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+  <line x1="40" y1="0" x2="40" y2="314" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+  <line x1="80" y1="0" x2="80" y2="314" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+  <line x1="120" y1="0" x2="120" y2="314" stroke="#ffffff" stroke-width="0.5" opacity="0.05"/>
+
+  <!-- Hexagon icon area -->
+  <polygon
+    points="82,30 108,45 108,75 82,90 56,75 56,45"
+    fill="#0f3460"
+  />
+  <polygon
+    points="82,34 104,47 104,73 82,86 60,73 60,47"
+    fill="none"
+    stroke="url(#accentGrad)"
+    stroke-width="1.5"
+    opacity="0.8"
+  />
+
+  <!-- O in hexagon -->
+  <text
+    x="82"
+    y="74"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial Black"
+    font-size="38"
+    font-weight="900"
+    fill="#e94560"
+    filter="url(#glow)"
+  >O</text>
+
+  <!-- App name -->
+  <text
+    x="82"
+    y="118"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial"
+    font-size="16"
+    font-weight="700"
+    fill="#ffffff"
+  >Omni</text>
+
+  <text
+    x="82"
+    y="138"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial"
+    font-size="16"
+    font-weight="700"
+    fill="#e94560"
+  >Launcher</text>
+
+  <!-- MC badge -->
+  <rect x="62" y="146" width="40" height="18" rx="9" fill="#e94560" opacity="0.2"/>
+  <rect x="62" y="146" width="40" height="18" rx="9" fill="none" stroke="#e94560" stroke-width="1" opacity="0.6"/>
+  <text
+    x="82"
+    y="159"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial"
+    font-size="10"
+    font-weight="700"
+    letter-spacing="3"
+    fill="#e94560"
+  >MC</text>
+
+  <!-- Divider -->
+  <rect x="20" y="175" width="124" height="1" rx="0.5" fill="url(#accentGrad)" opacity="0.4"/>
+
+  <!-- Feature dots -->
+  <circle cx="30" cy="198" r="3" fill="#e94560"/>
+  <text x="42" y="202" font-family="Segoe UI, Arial" font-size="10" fill="#c4c4c4">Fast Launch</text>
+
+  <circle cx="30" cy="220" r="3" fill="#e94560"/>
+  <text x="42" y="224" font-family="Segoe UI, Arial" font-size="10" fill="#c4c4c4">Version Manager</text>
+
+  <circle cx="30" cy="242" r="3" fill="#e94560"/>
+  <text x="42" y="246" font-family="Segoe UI, Arial" font-size="10" fill="#c4c4c4">Custom RAM</text>
+
+  <circle cx="30" cy="264" r="3" fill="#e94560"/>
+  <text x="42" y="268" font-family="Segoe UI, Arial" font-size="10" fill="#c4c4c4">Error Tracking</text>
+
+  <!-- Bottom divider -->
+  <rect x="20" y="284" width="124" height="1" rx="0.5" fill="#ffffff" opacity="0.1"/>
+
+  <!-- Bottom publisher -->
+  <text
+    x="82"
+    y="302"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial"
+    font-size="9"
+    fill="#c4c4c4"
+    opacity="0.5"
+    letter-spacing="1"
+  >by OmniNodeCo</text>
+
+  <!-- Bottom decorative bar -->
+  <rect y="310" width="164" height="4" fill="url(#accentGrad)"/>
+</svg>
