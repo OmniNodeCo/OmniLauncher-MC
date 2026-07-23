@@ -16,7 +16,9 @@
 ├── TERMS.txt
 ├── TREE.md
 ├── build.py
+├── icon.svg
+├── installer.iss
 ├── main.py
 └── pyproject.toml
 
-6 directories, 14 files
+6 directories, 16 files
