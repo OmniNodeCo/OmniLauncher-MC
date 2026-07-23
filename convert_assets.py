@@ -1,5 +1,6 @@
 """Convert SVG assets to BMP and ICO for the installer."""
 
+import cairosvg
 from PIL import Image
 import os
 
@@ -7,15 +8,28 @@ import os
 def convert_assets() -> None:
     os.makedirs("assets", exist_ok=True)
 
-    # Banner
+    # SVG to PNG
+    cairosvg.svg2png(url="icon.svg", write_to="icon-256.png",
+                     output_width=256, output_height=256)
+    print("Icon SVG to PNG done")
+
+    cairosvg.svg2png(url="installer-banner.svg", write_to="installer-banner.png",
+                     output_width=164, output_height=314)
+    print("Banner SVG to PNG done")
+
+    cairosvg.svg2png(url="installer-logo.svg", write_to="installer-logo.png",
+                     output_width=55, output_height=55)
+    print("Logo SVG to PNG done")
+
+    # Banner PNG to BMP
     Image.open("installer-banner.png").save("assets/installer-banner.bmp")
     print("Banner converted to BMP")
 
-    # Logo
+    # Logo PNG to BMP
     Image.open("installer-logo.png").save("assets/installer-logo.bmp")
     print("Logo converted to BMP")
 
-    # Icon - multiple sizes
+    # Icon PNG to ICO
     sizes = [16, 32, 48, 64, 128, 256]
     imgs = []
     for size in sizes:

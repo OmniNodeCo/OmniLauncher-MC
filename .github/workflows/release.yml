@@ -30,19 +30,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra build
 
-      - name: Install Pillow
-        run: pip install pillow
+      - name: Install conversion dependencies
+        run: pip install cairosvg pillow
 
-      - name: Install Inkscape
-        run: choco install inkscape -y
-
-      - name: Convert SVGs to PNG
-        run: |
-          & "C:\Program Files\Inkscape\bin\inkscape.exe" icon.svg --export-type=png --export-filename=icon-256.png --export-width=256 --export-height=256
-          & "C:\Program Files\Inkscape\bin\inkscape.exe" installer-banner.svg --export-type=png --export-filename=installer-banner.png --export-width=164 --export-height=314
-          & "C:\Program Files\Inkscape\bin\inkscape.exe" installer-logo.svg --export-type=png --export-filename=installer-logo.png --export-width=55 --export-height=55
-
-      - name: Convert PNGs to BMP and ICO
+      - name: Convert all assets
         run: python convert_assets.py
 
       - name: Build with PyInstaller
