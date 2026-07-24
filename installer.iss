@@ -104,6 +104,4 @@ begin
 
   WizardForm.TasksList.Color := $0f3460;
   WizardForm.TasksList.Font.Color := $ffffff;
-
-  WizardForm.ProgressGauge.BackColor := $0f3460;
 end;
