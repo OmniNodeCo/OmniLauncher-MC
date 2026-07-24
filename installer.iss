@@ -22,7 +22,7 @@ OutputBaseFilename=OmniLauncher-MC-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-WizardSizePercent=120,120
+WizardSizePercent=150,150
 DisableWelcomePage=no
 
 WindowVisible=yes
