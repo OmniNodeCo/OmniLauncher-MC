@@ -1,8 +1,48 @@
 ---Official Changelog for OmniLauncher-MC---
 
-- 1.0.0
+- 0.1.0
 - Beta GUI
 - Minecraft Launching Feature
 
-- 1.0.1
-- Added Error traceback handler
+- 0.1.1
+- Added Error traceback handler.
+
+- 0.2.0 (Major Rebuild)
+- Complete UI redesign:
+  - New dark themes: Dark, Midnight, Light, AMOLED with accent picker
+  - Sidebar navigation with modern icons, user card, quick actions (11 sections)
+  - Play tab with instance preview, favorites, news, RAM quick slider
+  - Instances management: grid/list, groups, favorites, search, sort, context menu
+  - Accounts: offline multi-account, skin type (steve/alex), selection, avatar preview
+  - Skins tab with placeholder preview and skin type toggle
+  - Mods & Addons placeholder ready for Modrinth/CurseForge integration
+  - File Explorer with bookmarks (saves, resourcepacks, mods, screenshots, logs, config, shaderpacks, crash-reports)
+  - Server Browser experimental (search/filter/sort, player counts, join)
+  - Friends List experimental (online/offline, invite)
+  - Settings with 7 sub-sections and 60+ options:
+    General: language, mc dir, snapshots/beta/alpha toggles, launcher visibility, concurrent downloads, tray
+    Java: auto-detect, java path, detected list, RAM min/max, JVM args, GC logging
+    Game: custom resolution, fullscreen, game args, demo, multiplayer disable, auto-connect
+    Appearance: theme, accent palette, background style, layout (modern/classic), animations, compact mode
+    Network: offline mode, proxy (http/socks5/system), host/port/auth, timeout, parallel downloads
+    Launcher: console visible, auto-scroll, word wrap, font size, filter level, log days, debug, file watcher
+    Advanced: env vars, pre/post launch commands, wrapper, process monitor, crash analyzer, malware scanner
+  - Console: search, filter level, auto-scroll toggle, clear/copy/export, colored logs, crash analyzer dialog, file explorer open
+  - About: changelog, license, terms, system info
+  - Footer with status, progress bar, version, PLAY button
+  - Header with refresh and open .minecraft
+
+- Added crash analyzer detecting OOM, Java version mismatch, GLFW, mod loading, Fractureiser malware, permission errors
+- Added dialogs: CrashReportDialog, ConfirmDialog, FileExplorerDialog
+- Added services: Java auto-detection (filesystem + PATH), versions caching, accounts, instances, file explorer, crash analyzer
+- Settings persistence in AppData / .config with fallback
+- Improved launcher service with instance isolated dirs, ram overrides, java overrides
+- Real-time console with timestamp and level colors
+- Performance: scrollable frames with mouse wheel support
+
+- Future Roadmap
+  - Modrinth & CurseForge integration (search, one-click install, dependency resolve)
+  - Server Browser & Friends List improvements
+  - Built-in file explorer drag-drop and file watch
+  - GPU acceleration and tray minimization to free RAM
+  - Malware scanner auto-run before launch

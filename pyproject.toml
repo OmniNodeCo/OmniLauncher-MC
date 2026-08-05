@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnilauncher-mc"
-version = "0.1.0"
-description = "A modern Minecraft launcher built with Python"
+version = "0.2.0"
+description = "OmniLauncher-MC: modern dark Minecraft launcher with sidebar, instances, accounts, extensive settings, crash analyzer, and file explorer"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
