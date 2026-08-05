@@ -3,7 +3,17 @@
 import traceback
 import datetime
 import uuid
-from tkinter.messagebox import showerror
+import sys
+
+try:
+    from tkinter.messagebox import showerror
+
+    HAS_TK = True
+except Exception:
+    HAS_TK = False
+
+    def showerror(title, message):
+        print(f"[{title}] {message}", file=sys.stderr)
 
 
 def handle_error(exception: Exception, log_path: str = "launcher.log") -> uuid.UUID:
@@ -33,12 +43,18 @@ Details:
 =====================================
 """
 
-    with open(log_path, "a") as file:
-        file.write(log_entry)
+    try:
+        with open(log_path, "a", encoding="utf-8") as file:
+            file.write(log_entry)
+    except Exception:
+        pass
 
-    showerror(
-        "Error",
-        f"An error occurred.\nError ID: {error_id}\nPlease report this on Github."
-    )
+    try:
+        showerror(
+            "Error",
+            f"An error occurred.\nError ID: {error_id}\nPlease report this on Github.",
+        )
+    except Exception:
+        print(f"Error {error_id}: {exception}", file=sys.stderr)
 
     return error_id

@@ -982,13 +982,65 @@ class OmniLauncherApp:
         tk.Label(left, text=desc, font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], wraplength=380, justify="left", anchor="w").pack(anchor="w", pady=(2, 0))
 
         right = tk.Frame(row, bg=th["card_bg"])
-        right.pack(side="right", padx=16)
-        if widget:
+        right.pack(side="right", padx=16, pady=4, fill="y")
+
+        if widget is not None:
             try:
-                widget.configure(bg=th["input_bg"])
+                # try to reconfigure bg if possible
+                widget.configure(bg=th["card_bg"])
             except Exception:
-                pass
-            widget.pack(in_=right)
+                try:
+                    widget.configure(bg=th["input_bg"])
+                except Exception:
+                    pass
+
+            # Robust packing: handle wrapper Frame cases that caused TclError
+            # If widget is a Checkbutton inside a wrapper Frame(parent), we pack wrapper into right
+            try:
+                # If widget parent is not right and is a Frame whose parent is the settings page (parent param),
+                # then we should pack that wrapper Frame into right, and ensure widget is packed inside wrapper.
+                master = widget.master
+                if isinstance(master, tk.Frame) and master.master == parent and master != parent:
+                    # wrapper case: widget inside wrapper Frame(p)
+                    try:
+                        if not widget.winfo_ismapped():
+                            widget.pack(side="left", padx=2)
+                    except Exception:
+                        pass
+                    try:
+                        master.pack(in_=right, side="left")
+                    except tk.TclError:
+                        # fallback: pack master directly without in_
+                        try:
+                            master.pack(side="left")
+                            # try again to place master into right via right being parent? Use pack with right as parent via in_ if fails, just pack
+                            right_inner = tk.Frame(right, bg=th["card_bg"])
+                            right_inner.pack()
+                            master.pack(in_=right_inner)
+                        except Exception:
+                            try:
+                                master.pack(side="left")
+                            except Exception:
+                                pass
+                else:
+                    # Normal case: widget parent is parent or frame_dir etc. Try in_=right, fallback to side left
+                    try:
+                        widget.pack(in_=right, side="left")
+                    except tk.TclError:
+                        try:
+                            # If widget is Frame (like frame_dir containing entries), pack it into right
+                            widget.pack(in_=right, side="left")
+                        except tk.TclError:
+                            # final fallback: if widget already has parent, try to pack its parent
+                            try:
+                                widget.pack(side="left")
+                            except Exception:
+                                pass
+            except Exception:
+                try:
+                    widget.pack(side="left")
+                except Exception:
+                    pass
 
         sep = tk.Frame(parent, bg=th["separator"], height=1)
         sep.pack(fill="x", padx=24)
@@ -1001,6 +1053,7 @@ class OmniLauncherApp:
         # lang
         var_lang = tk.StringVar(value=self.settings.get("general", "language", default="en_US"))
         combo = ttk.Combobox(p, textvariable=var_lang, values=["en_US", "es_ES", "fr_FR", "de_DE", "pt_BR", "ru_RU"], state="readonly", width=18)
+        combo.bind("<<ComboboxSelected>>", lambda e: (self.settings.set(var_lang.get(), "general", "language"), self.settings.save()))
         self._settings_row(p, "Language", "Interface language. Restart required.", combo)
 
         # mc dir
@@ -1012,7 +1065,7 @@ class OmniLauncherApp:
         btn_browse.pack(side="left", padx=4)
         self._settings_row(p, "Minecraft Directory", "Folder where Minecraft stores worlds, mods, etc. Custom per-instance possible.", frame_dir)
 
-        # version toggles
+        # version toggles - fixed: directly create checkbutton without wrapper to avoid TclError
         for key, title, desc in [
             ("show_snapshots", "Show Snapshots", "Include snapshot versions in version list."),
             ("show_beta", "Show Beta", "Include old beta versions."),
@@ -1021,13 +1074,11 @@ class OmniLauncherApp:
             ("sort_versions_desc", "Sort Newest First", "Descending sort of versions."),
             ("check_updates", "Check for Launcher Updates", "Automatically check GitHub releases."),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("general", key, default=False))
-            if key == "sort_versions_desc":
-                var = tk.BooleanVar(value=self.settings.get("general", key, default=True))
-            chk = tk.Checkbutton(frame_dir, variable=var, bg=th["card_bg"], activebackground=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "general", k), self.settings.save(), self._reload_versions()))
-            # create new frame to hold checkbox for each row
-            wrapper = tk.Frame(p, bg=th["card_bg"])
-            c = tk.Checkbutton(wrapper, variable=var, bg=th["card_bg"], activebackground=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "general", k), self.settings.save(), self._reload_versions() if k.startswith("show_") else None))
+            default = True if key == "sort_versions_desc" else False
+            var = tk.BooleanVar(value=self.settings.get("general", key, default=default))
+            # create checkbutton with parent p, _settings_row will handle packing into right via in_=right
+            c = tk.Checkbutton(p, variable=var, bg=th["card_bg"], activebackground=th["card_bg"], selectcolor=th["input_bg"],
+                               command=lambda k=key, v=var: (self.settings.set(v.get(), "general", k), self.settings.save(), self._reload_versions() if k.startswith("show_") else None))
             self._settings_row(p, title, desc, c)
 
         # keep launcher open
