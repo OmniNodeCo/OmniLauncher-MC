@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "minecraft-launcher-lib>=2.0",
+    "PySide6>=6.6",
 ]
 [project.optional-dependencies]
 build = [

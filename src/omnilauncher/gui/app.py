@@ -1,4 +1,4 @@
-"""OmniLauncher-MC main application - modern inspired redesign.
+"""OmniLauncher-MC main application - PySide6 modern redesign.
 
 Full-featured dark launcher with sidebar navigation, instance management,
 account switching, extensive settings, console, skin preview.
@@ -6,25 +6,58 @@ account switching, extensive settings, console, skin preview.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import platform
 import subprocess
 import sys
 import threading
-import datetime
 import webbrowser
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QGridLayout,
+    QStackedWidget,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QComboBox,
+    QCheckBox,
+    QSlider,
+    QSpinBox,
+    QDoubleSpinBox,
+    QProgressBar,
+    QScrollArea,
+    QFrame,
+    QTextEdit,
+    QPlainTextEdit,
+    QListWidget,
+    QListWidgetItem,
+    QSizePolicy,
+    QFileDialog,
+    QMessageBox,
+    QMenu,
+    QSpinBox,
+    QColorDialog,
+    QTabWidget,
+    QSplitter,
+    QGroupBox,
+    QButtonGroup,
+)
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QSize
+from PySide6.QtGui import QFont, QColor, QAction, QIcon, QPalette
 
-# Try to import settings and services
 from omnilauncher.config.settings import get_settings_manager, SettingsManager
-from omnilauncher.gui.themes import get_theme, THEMES, ACCENT_PALETTE, FONTS
+from omnilauncher.gui.themes import get_theme, THEMES, ACCENT_PALETTE, generate_stylesheet
 from omnilauncher.gui.components.sidebar import Sidebar
-from omnilauncher.gui.components.cards import InstanceCard, AccountCard
+from omnilauncher.gui.components.cards import InstanceCard, AccountCard, ICON_COLORS
 
 try:
     from omnilauncher.services.versions import (
@@ -36,7 +69,7 @@ try:
     from omnilauncher.services.accounts import AccountService
     from omnilauncher.services.instances import InstanceService, BLOCK_ICONS
     from omnilauncher.services.java import find_java_executables
-    from omnilauncher.services.file_explorer import get_bookmarks as get_file_bookmarks
+    from omnilauncher.services.file_explorer import get_bookmarks as get_file_bookmarks, list_files
     from omnilauncher.services.crash_analyzer import analyze_crash
     from omnilauncher.gui.components.dialogs import CrashReportDialog, FileExplorerDialog
     from omnilauncher.services import launcher as launcher_svc
@@ -62,56 +95,18 @@ except Exception:
     BLOCK_ICONS = ["grass", "diamond", "tnt"]
     find_java_executables = lambda: []
     get_file_bookmarks = lambda x: []
+    list_files = lambda x: []
     CrashReportDialog = None
     FileExplorerDialog = None
     launcher_svc = None
 
 
+VERSION = "0.2.0"
+
+
 # ------------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------------
-
-class ScrollableFrame(tk.Frame):
-    def __init__(self, parent, theme, **kwargs):
-        super().__init__(parent, bg=theme["bg"], **kwargs)
-        self.theme = theme
-        self.canvas = tk.Canvas(self, bg=theme["bg"], highlightthickness=0, bd=0)
-        self.vsb = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview, bg=theme["scrollbar_bg"])
-        self.canvas.configure(yscrollcommand=self.vsb.set)
-
-        self.vsb.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-
-        self.inner = tk.Frame(self.canvas, bg=theme["bg"])
-        self.window = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
-
-        self.inner.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.window, width=e.width))
-
-        # mousewheel
-        self.canvas.bind_all("<MouseWheel>", self._on_wheel_windows)
-        self.canvas.bind_all("<Button-4>", self._on_wheel_linux_up)
-        self.canvas.bind_all("<Button-5>", self._on_wheel_linux_down)
-
-    def _on_wheel_windows(self, event):
-        try:
-            if self.winfo_exists():
-                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        except Exception:
-            pass
-
-    def _on_wheel_linux_up(self, event):
-        try:
-            self.canvas.yview_scroll(-1, "units")
-        except Exception:
-            pass
-
-    def _on_wheel_linux_down(self, event):
-        try:
-            self.canvas.yview_scroll(1, "units")
-        except Exception:
-            pass
-
 
 def open_folder(path: str):
     p = Path(path)
@@ -122,72 +117,128 @@ def open_folder(path: str):
             pass
     try:
         if platform.system() == "Windows":
-            os.startfile(str(p))  # type: ignore
+            os.startfile(str(p))
         elif platform.system() == "Darwin":
             subprocess.Popen(["open", str(p)])
         else:
             subprocess.Popen(["xdg-open", str(p)])
     except Exception as e:
-        messagebox.showerror("Open Folder", f"Failed to open {path}\n{e}")
+        QMessageBox.critical(None, "Open Folder", f"Failed to open {path}\n{e}")
+
+
+def make_scroll_area(widget: QWidget, theme: Dict[str, str]) -> QScrollArea:
+    """Wrap a widget in a styled scroll area."""
+    scroll = QScrollArea()
+    scroll.setWidget(widget)
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+    return scroll
+
+
+def make_card_frame(theme: Dict[str, str], parent=None) -> QFrame:
+    """Create a card-styled frame."""
+    f = QFrame(parent)
+    f.setStyleSheet(f"""
+        QFrame {{
+            background-color: {theme['card_bg']};
+            border: 1px solid {theme['card_border']};
+            border-radius: 10px;
+        }}
+    """)
+    return f
+
+
+def make_section_label(text: str, theme: Dict[str, str], size: int = 16, bold: bool = True) -> QLabel:
+    lbl = QLabel(text)
+    weight = QFont.Weight.Bold if bold else QFont.Weight.Normal
+    lbl.setFont(QFont("Segoe UI", size, weight))
+    lbl.setStyleSheet(f"color: {theme['text_primary']};")
+    return lbl
+
+
+def make_desc_label(text: str, theme: Dict[str, str]) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setFont(QFont("Segoe UI", 9))
+    lbl.setStyleSheet(f"color: {theme['text_secondary']};")
+    lbl.setWordWrap(True)
+    return lbl
+
+
+def make_accent_button(text: str, theme: Dict[str, str]) -> QPushButton:
+    btn = QPushButton(text)
+    btn.setProperty("accent", True)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    return btn
+
+
+def make_toolbar_button(text: str, theme: Dict[str, str]) -> QPushButton:
+    btn = QPushButton(text)
+    btn.setFont(QFont("Segoe UI", 9))
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    return btn
 
 
 # ------------------------------------------------------------------
-# Main App
+# Background worker for version fetching
 # ------------------------------------------------------------------
 
-class OmniLauncherApp:
+class VersionWorker(QThread):
+    finished = Signal(list)
+
+    def __init__(self, settings):
+        super().__init__()
+        self.settings = settings
+
+    def run(self):
+        try:
+            refresh_cache()
+            versions = get_version_list(self.settings)
+            ids = [v["id"] for v in versions]
+        except Exception:
+            ids = get_release_versions(self.settings)
+        self.finished.emit(ids)
+
+
+class JavaWorker(QThread):
+    finished = Signal(list)
+
+    def run(self):
+        javas = find_java_executables()
+        self.finished.emit(javas)
+
+
+# ------------------------------------------------------------------
+# Main Window
+# ------------------------------------------------------------------
+
+class OmniLauncherApp(QMainWindow):
     def __init__(self):
+        super().__init__()
         self.settings: SettingsManager = get_settings_manager()
         self.theme_name = self.settings.get("appearance", "theme", default="dark")
         self.theme = get_theme(self.theme_name)
 
-        self.root = tk.Tk()
-        self.root.title("OmniLauncher-MC • v0.2.0")
+        self.setWindowTitle(f"OmniLauncher-MC • v{VERSION}")
         geom = self.settings.get("meta", "window_geometry", default="1180x760")
-        self.root.geometry(geom)
-        self.root.minsize(1060, 640)
-        self.root.configure(bg=self.theme["bg"])
-        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+        w, h = geom.split("x")
+        self.resize(int(w), int(h))
+        self.setMinimumSize(1060, 640)
 
-        # Icon if available?
-        try:
-            # try to set icon from svg converted? fallback
-            pass
-        except Exception:
-            pass
-
-        # style
-        self.style = ttk.Style()
-        try:
-            self.style.theme_use("clam")
-        except Exception:
-            pass
-        self._configure_styles()
-
-        # services
+        # Services
         self.account_svc = AccountService(self.settings) if AccountService else None
         self.instance_svc = InstanceService(self.settings) if InstanceService else None
 
-        # state
+        # State
         self.current_page = "play"
-        self.current_settings_subpage = "general"
-        self.search_var = tk.StringVar()
-        self.version_filter_var = tk.StringVar()
-        self.play_version_var = tk.StringVar()
-        self.play_account_var = tk.StringVar()
-        self.ram_var = tk.IntVar(value=self.settings.get("java", "max_ram_mb", default=4096))
-        self.status_var = tk.StringVar(value="Ready")
-        self.progress_var = tk.IntVar(value=0)
-        self.progress_max = 100
+        self.versions_list: List[str] = []
+        self._console_lines: List[str] = []
 
-        # pages dict
-        self.pages: Dict[str, tk.Frame] = {}
-        self.settings_subpages: Dict[str, tk.Frame] = {}
+        # Build UI
+        self._build_ui()
+        self._apply_theme()
 
-        # build UI
-        self._build_layout()
-
-        # listeners for launcher state
+        # Launcher listeners
         if launcher_svc:
             try:
                 launcher_svc.add_status_listener(self._on_status_update)
@@ -196,165 +247,64 @@ class OmniLauncherApp:
             except Exception:
                 pass
 
-        # initial data
-        self.root.after(100, self._initial_load)
+        # Initial load
+        QTimer.singleShot(100, self._initial_load)
+        QTimer.singleShot(200, self._poll_launcher_state)
 
-        # polling as fallback
-        self.root.after(200, self._poll_launcher_state)
+    def _build_ui(self):
+        t = self.theme
 
-    # styles
-    def _configure_styles(self):
-        th = self.theme
-        self.style.configure("TFrame", background=th["bg"])
-        self.style.configure("Card.TFrame", background=th["card_bg"])
-        self.style.configure("Header.TFrame", background=th["header_bg"])
-        self.style.configure("Footer.TFrame", background=th["footer_bg"])
-        self.style.configure("TLabel", background=th["bg"], foreground=th["text_primary"], font=FONTS["body"])
-        self.style.configure("Header.TLabel", background=th["header_bg"], foreground=th["text_primary"])
-        self.style.configure("Card.TLabel", background=th["card_bg"], foreground=th["text_primary"])
-        self.style.configure("Muted.TLabel", foreground=th["text_secondary"])
-        self.style.configure("Title.TLabel", font=FONTS["title_large"], foreground=th["text_primary"])
-        self.style.configure("Custom.TButton", font=FONTS["body_bold"])
-        self.style.configure("Accent.TButton", background=th["accent"], foreground="white")
-        self.style.configure("TEntry", fieldbackground=th["input_bg"], foreground=th["text_primary"])
-        self.style.configure("TCombobox", fieldbackground=th["input_bg"], background=th["input_bg"], foreground=th["text_primary"])
-        self.style.configure("Horizontal.TProgressbar", background=th["progress_fg"], troughcolor=th["progress_bg"], borderwidth=0, thickness=6)
-        self.style.configure("TCheckbutton", background=th["card_bg"], foreground=th["text_primary"])
-        self.style.configure("TNotebook", background=th["bg"], borderwidth=0)
-        self.style.configure("TNotebook.Tab", background=th["card_bg"], foreground=th["text_secondary"], padding=[12, 6])
-        self.style.map("TNotebook.Tab", background=[("selected", th["sidebar_active"])], foreground=[("selected", th["text_primary"])])
+        # Central widget
+        central = QWidget()
+        self.setCentralWidget(central)
+        main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-    def _build_layout(self):
-        th = self.theme
-        # main container
-        container = tk.Frame(self.root, bg=th["bg"])
-        container.pack(fill="both", expand=True)
+        # Sidebar
+        self.sidebar = Sidebar(t)
+        self.sidebar.page_selected.connect(self._on_sidebar_select)
+        main_layout.addWidget(self.sidebar)
 
-        # sidebar
-        self.sidebar = Sidebar(container, th, self._on_sidebar_select)
-        self.sidebar.pack(side="left", fill="y")
-        self.sidebar.set_active("play")
+        # Right side
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
 
-        # right side
-        right = tk.Frame(container, bg=th["bg"])
-        right.pack(side="right", fill="both", expand=True)
+        # Header
+        self.header_frame = QFrame()
+        self.header_frame.setFixedHeight(64)
+        self.header_frame.setObjectName("header")
+        hdr_layout = QHBoxLayout(self.header_frame)
+        hdr_layout.setContentsMargins(24, 0, 16, 0)
 
-        # header
-        self.header_frame = tk.Frame(right, bg=th["header_bg"], height=64)
-        self.header_frame.pack(side="top", fill="x")
-        self.header_frame.pack_propagate(False)
+        self.header_title = QLabel("Play")
+        self.header_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.header_title.setStyleSheet(f"color: {t['text_primary']};")
+        hdr_layout.addWidget(self.header_title)
 
-        self.header_title = tk.Label(
-            self.header_frame,
-            text="Play",
-            font=("Segoe UI", 16, "bold"),
-            bg=th["header_bg"],
-            fg=th["text_primary"],
-        )
-        self.header_title.pack(side="left", padx=24, pady=12)
+        self.header_sub = QLabel("Launch and manage your Minecraft worlds")
+        self.header_sub.setFont(QFont("Segoe UI", 9))
+        self.header_sub.setStyleSheet(f"color: {t['text_secondary']};")
+        hdr_layout.addWidget(self.header_sub)
+        hdr_layout.addStretch()
 
-        self.header_sub = tk.Label(
-            self.header_frame,
-            text="Launch and manage your Minecraft worlds",
-            font=("Segoe UI", 9),
-            bg=th["header_bg"],
-            fg=th["text_secondary"],
-        )
-        self.header_sub.pack(side="left", padx=6, pady=18)
+        refresh_btn = make_toolbar_button("🔄 Refresh", t)
+        refresh_btn.clicked.connect(self._refresh_all)
+        hdr_layout.addWidget(refresh_btn)
 
-        # header right actions
-        hdr_right = tk.Frame(self.header_frame, bg=th["header_bg"])
-        hdr_right.pack(side="right", padx=16)
+        folder_btn = make_toolbar_button("📁 .minecraft", t)
+        folder_btn.clicked.connect(lambda: open_folder(self.settings.minecraft_dir))
+        hdr_layout.addWidget(folder_btn)
 
-        tk.Button(
-            hdr_right,
-            text="🔄 Refresh",
-            font=("Segoe UI", 9),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            bd=0,
-            padx=12,
-            pady=6,
-            command=self._refresh_all,
-            activebackground=th["card_hover"],
-            activeforeground=th["text_primary"],
-        ).pack(side="left", padx=4)
+        right_layout.addWidget(self.header_frame)
 
-        tk.Button(
-            hdr_right,
-            text="📁 .minecraft",
-            font=("Segoe UI", 9),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            bd=0,
-            padx=12,
-            pady=6,
-            command=lambda: open_folder(self.settings.minecraft_dir),
-            activebackground=th["card_hover"],
-        ).pack(side="left", padx=4)
+        # Pages container (stacked)
+        self.pages_stack = QStackedWidget()
+        right_layout.addWidget(self.pages_stack, 1)
 
-        # pages container
-        self.pages_container = tk.Frame(right, bg=th["bg"])
-        self.pages_container.pack(side="top", fill="both", expand=True)
-
-        # footer
-        self.footer_frame = tk.Frame(right, bg=th["footer_bg"], height=56)
-        self.footer_frame.pack(side="bottom", fill="x")
-        self.footer_frame.pack_propagate(False)
-
-        # status
-        status_left = tk.Frame(self.footer_frame, bg=th["footer_bg"])
-        status_left.pack(side="left", fill="y", padx=16, pady=8)
-
-        self.status_label = tk.Label(
-            status_left,
-            textvariable=self.status_var,
-            font=("Segoe UI", 9),
-            bg=th["footer_bg"],
-            fg=th["text_secondary"],
-        )
-        self.status_label.pack(side="left")
-
-        self.progress = ttk.Progressbar(
-            status_left,
-            variable=self.progress_var,
-            maximum=100,
-            length=220,
-            mode="determinate",
-            style="Horizontal.TProgressbar",
-        )
-        self.progress.pack(side="left", padx=12, pady=10)
-
-        # footer right: account + launch
-        footer_right = tk.Frame(self.footer_frame, bg=th["footer_bg"])
-        footer_right.pack(side="right", padx=16, pady=8)
-
-        self.footer_version_label = tk.Label(
-            footer_right,
-            text="1.21.1 • Vanilla",
-            font=("Segoe UI", 9),
-            bg=th["footer_bg"],
-            fg=th["text_muted"],
-        )
-        self.footer_version_label.pack(side="left", padx=12)
-
-        self.launch_btn = tk.Button(
-            footer_right,
-            text="▶  PLAY",
-            font=("Segoe UI", 11, "bold"),
-            bg=th["play_button_bg"],
-            fg="white",
-            activebackground=th["play_button_hover"],
-            bd=0,
-            padx=28,
-            pady=10,
-            command=self._on_launch_clicked,
-        )
-        self.launch_btn.pack(side="left")
-        self.launch_btn.bind("<Enter>", lambda e: self.launch_btn.configure(bg=th["play_button_hover"]))
-        self.launch_btn.bind("<Leave>", lambda e: self.launch_btn.configure(bg=th["play_button_bg"]))
-
-        # build pages
+        # Build all pages
         self._build_play_page()
         self._build_instances_page()
         self._build_accounts_page()
@@ -367,329 +317,426 @@ class OmniLauncherApp:
         self._build_console_page()
         self._build_about_page()
 
-        # show play initially
+        # Footer
+        self.footer_frame = QFrame()
+        self.footer_frame.setFixedHeight(56)
+        self.footer_frame.setObjectName("footer")
+        footer_layout = QHBoxLayout(self.footer_frame)
+        footer_layout.setContentsMargins(16, 0, 16, 0)
+
+        self.status_label = QLabel("Ready")
+        self.status_label.setFont(QFont("Segoe UI", 9))
+        self.status_label.setStyleSheet(f"color: {t['text_secondary']};")
+        footer_layout.addWidget(self.status_label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedWidth(220)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        footer_layout.addWidget(self.progress_bar)
+
+        footer_layout.addStretch()
+
+        self.footer_version_label = QLabel("1.21.1 • Vanilla")
+        self.footer_version_label.setFont(QFont("Segoe UI", 9))
+        self.footer_version_label.setStyleSheet(f"color: {t['text_muted']};")
+        footer_layout.addWidget(self.footer_version_label)
+
+        self.launch_btn = QPushButton("▶  PLAY")
+        self.launch_btn.setProperty("play", True)
+        self.launch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.launch_btn.clicked.connect(self._on_launch_clicked)
+        footer_layout.addWidget(self.launch_btn)
+
+        right_layout.addWidget(self.footer_frame)
+
+        main_layout.addWidget(right, 1)
+
+        # Set initial page
         self._show_page("play")
 
     # ------------------------------------------------------------------
-    # Pages builders
+    # Page builders
     # ------------------------------------------------------------------
 
-    def _make_page(self, key: str) -> tk.Frame:
-        th = self.theme
-        f = tk.Frame(self.pages_container, bg=th["bg"])
-        self.pages[key] = f
-        return f
+    def _make_page(self) -> QWidget:
+        page = QWidget()
+        page.setObjectName("page")
+        return page
 
-    # PLAY
+    def _make_page_scroll(self) -> tuple[QWidget, QWidget]:
+        """Create a page with scroll area. Returns (outer_page, inner_content)."""
+        outer = self._make_page()
+        layout = QVBoxLayout(outer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        inner = QWidget()
+        inner.setObjectName("scrollContent")
+        scroll.setWidget(inner)
+
+        layout.addWidget(scroll)
+        return outer, inner
+
+    # PLAY PAGE
     def _build_play_page(self):
-        th = self.theme
-        page = self._make_page("play")
+        t = self.theme
+        outer = self._make_page()
+        layout = QHBoxLayout(outer)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
-        # split in 2 columns
-        left = tk.Frame(page, bg=th["bg"])
-        left.pack(side="left", fill="both", expand=True, padx=16, pady=16)
-        right = tk.Frame(page, bg=th["bg"], width=340)
-        right.pack(side="right", fill="y", padx=(0, 16), pady=16)
-        right.pack_propagate(False)
+        # Left column
+        left = QVBoxLayout()
+        left.setSpacing(16)
 
-        # banner news
-        banner = tk.Frame(left, bg=th["card_bg"], height=140, highlightthickness=1, highlightbackground=th["card_border"])
-        banner.pack(fill="x", pady=(0, 16))
-        banner.pack_propagate(False)
-        tk.Label(
-            banner,
-            text="Welcome to OmniLauncher • v0.2.0",
-            font=("Segoe UI", 14, "bold"),
-            bg=th["card_bg"],
-            fg=th["text_primary"],
-        ).pack(anchor="w", padx=20, pady=(16, 4))
-        tk.Label(
-            banner,
-            text="Manage instances, accounts, mods, and launch any Minecraft version • Offline and Microsoft accounts • Full crash analyzer",
-            font=("Segoe UI", 9),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            wraplength=600,
-            justify="left",
-        ).pack(anchor="w", padx=20)
-        tk.Label(
-            banner,
-            text="Built • Dark theme • Animated backgrounds • File explorer • Server browser • Friends list (experimental) • Modrinth / CurseForge ready",
-            font=("Segoe UI", 8),
-            bg=th["card_bg"],
-            fg=th["text_muted"],
-            wraplength=600,
-            justify="left",
-        ).pack(anchor="w", padx=20, pady=(8, 0))
+        # Banner
+        banner = make_card_frame(t)
+        banner.setFixedHeight(140)
+        b_layout = QVBoxLayout(banner)
+        b_layout.setContentsMargins(20, 16, 20, 16)
+        b_layout.addWidget(make_section_label(f"Welcome to OmniLauncher • v{VERSION}", t, 14))
+        b_layout.addWidget(make_desc_label(
+            "Manage instances, accounts, mods, and launch any Minecraft version • Offline and Microsoft accounts • Full crash analyzer", t))
+        tip = QLabel("Built with PySide6 • Dark theme • File explorer • Server browser")
+        tip.setFont(QFont("Segoe UI", 8))
+        tip.setStyleSheet(f"color: {t['text_muted']};")
+        b_layout.addWidget(tip)
+        left.addWidget(banner)
 
-        # selected instance card large
-        self.play_instance_frame = tk.Frame(left, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        self.play_instance_frame.pack(fill="x", pady=(0, 16))
+        # Selected instance card
+        inst_card = make_card_frame(t)
+        inst_layout = QHBoxLayout(inst_card)
+        inst_layout.setContentsMargins(16, 16, 16, 16)
+        inst_layout.setSpacing(12)
 
-        self.play_inst_icon = tk.Canvas(self.play_instance_frame, width=80, height=80, bg=th["card_bg"], highlightthickness=0)
-        self.play_inst_icon.pack(side="left", padx=16, pady=16)
+        self.play_inst_icon = QLabel("L")
+        self.play_inst_icon.setFixedSize(72, 72)
+        self.play_inst_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.play_inst_icon.setStyleSheet(f"""
+            QLabel {{
+                background-color: {t['accent']};
+                color: white;
+                border-radius: 12px;
+                font-size: 28px;
+                font-weight: bold;
+            }}
+        """)
+        inst_layout.addWidget(self.play_inst_icon)
 
-        self.play_inst_text = tk.Frame(self.play_instance_frame, bg=th["card_bg"])
-        self.play_inst_text.pack(side="left", fill="both", expand=True, pady=16)
+        inst_text = QVBoxLayout()
+        inst_text.setSpacing(4)
+        self.play_inst_name = QLabel("Latest Release")
+        self.play_inst_name.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.play_inst_name.setStyleSheet(f"color: {t['text_primary']};")
+        inst_text.addWidget(self.play_inst_name)
 
-        self.play_inst_name = tk.Label(
-            self.play_inst_text,
-            text="Latest Release",
-            font=("Segoe UI", 16, "bold"),
-            bg=th["card_bg"],
-            fg=th["text_primary"],
-            anchor="w",
-        )
-        self.play_inst_name.pack(anchor="w")
-        self.play_inst_details = tk.Label(
-            self.play_inst_text,
-            text="1.21.1 • Vanilla • 0h played",
-            font=("Segoe UI", 10),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            anchor="w",
-        )
-        self.play_inst_details.pack(anchor="w", pady=2)
-        self.play_inst_meta = tk.Label(
-            self.play_inst_text,
-            text="Never played • Default group",
-            font=("Segoe UI", 8),
-            bg=th["card_bg"],
-            fg=th["text_muted"],
-            anchor="w",
-        )
-        self.play_inst_meta.pack(anchor="w")
+        self.play_inst_details = QLabel("1.21.1 • Vanilla • 0h played")
+        self.play_inst_details.setFont(QFont("Segoe UI", 10))
+        self.play_inst_details.setStyleSheet(f"color: {t['text_secondary']};")
+        inst_text.addWidget(self.play_inst_details)
 
-        # mid row: launch options
-        opts_frame = tk.Frame(left, bg=th["bg"])
-        opts_frame.pack(fill="x", pady=8)
+        self.play_inst_meta = QLabel("Never played • Default group")
+        self.play_inst_meta.setFont(QFont("Segoe UI", 8))
+        self.play_inst_meta.setStyleSheet(f"color: {t['text_muted']};")
+        inst_text.addWidget(self.play_inst_meta)
 
-        # version row
-        v_frame = tk.Frame(opts_frame, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        v_frame.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=4)
+        inst_layout.addLayout(inst_text, 1)
+        left.addWidget(inst_card)
 
-        tk.Label(v_frame, text="Version", font=("Segoe UI", 9, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(12, 2))
-        self.version_combo = ttk.Combobox(v_frame, textvariable=self.play_version_var, state="readonly", width=28)
-        self.version_combo.pack(padx=12, pady=(2, 8), fill="x")
-        self.version_combo.bind("<<ComboboxSelected>>", lambda e: self._on_play_version_changed())
+        # Launch options row
+        opts_layout = QHBoxLayout()
+        opts_layout.setSpacing(8)
 
-        tk.Label(v_frame, text="Show:", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"]).pack(anchor="w", padx=12)
-        filter_frame = tk.Frame(v_frame, bg=th["card_bg"])
-        filter_frame.pack(fill="x", padx=12, pady=(0, 12))
-        self.show_snap_var = tk.BooleanVar(value=self.settings.get("general", "show_snapshots", default=False))
-        self.show_beta_var = tk.BooleanVar(value=self.settings.get("general", "show_beta", default=False))
-        self.show_alpha_var = tk.BooleanVar(value=self.settings.get("general", "show_alpha", default=False))
-        tk.Checkbutton(filter_frame, text="Snapshots", variable=self.show_snap_var, bg=th["card_bg"], fg=th["text_secondary"], selectcolor=th["input_bg"], activebackground=th["card_bg"], command=self._reload_versions).pack(side="left")
-        tk.Checkbutton(filter_frame, text="Beta", variable=self.show_beta_var, bg=th["card_bg"], fg=th["text_secondary"], selectcolor=th["input_bg"], activebackground=th["card_bg"], command=self._reload_versions).pack(side="left", padx=6)
-        tk.Checkbutton(filter_frame, text="Alpha", variable=self.show_alpha_var, bg=th["card_bg"], fg=th["text_secondary"], selectcolor=th["input_bg"], activebackground=th["card_bg"], command=self._reload_versions).pack(side="left")
+        # Version selector
+        ver_card = make_card_frame(t)
+        vc_layout = QVBoxLayout(ver_card)
+        vc_layout.setContentsMargins(12, 12, 12, 12)
+        vc_layout.setSpacing(6)
+        vc_layout.addWidget(make_section_label("Version", t, 9))
 
-        # account row
-        a_frame = tk.Frame(opts_frame, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        a_frame.pack(side="left", fill="x", expand=True, padx=(8, 0), pady=4)
+        self.version_combo = QComboBox()
+        self.version_combo.currentTextChanged.connect(self._on_play_version_changed)
+        vc_layout.addWidget(self.version_combo)
 
-        tk.Label(a_frame, text="Account", font=("Segoe UI", 9, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(12, 2))
-        self.account_combo = ttk.Combobox(a_frame, textvariable=self.play_account_var, state="readonly", width=22)
-        self.account_combo.pack(padx=12, pady=2, fill="x")
-        self.account_combo.bind("<<ComboboxSelected>>", lambda e: self._on_account_combo_changed())
+        filter_layout = QHBoxLayout()
+        self.show_snap_var = QCheckBox("Snapshots")
+        self.show_snap_var.setChecked(self.settings.get("general", "show_snapshots", default=False))
+        self.show_snap_var.stateChanged.connect(self._reload_versions)
+        filter_layout.addWidget(self.show_snap_var)
 
-        self.play_account_sub = tk.Label(a_frame, text="Offline • Steve skin", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"])
-        self.play_account_sub.pack(anchor="w", padx=12, pady=2)
+        self.show_beta_var = QCheckBox("Beta")
+        self.show_beta_var.setChecked(self.settings.get("general", "show_beta", default=False))
+        self.show_beta_var.stateChanged.connect(self._reload_versions)
+        filter_layout.addWidget(self.show_beta_var)
 
-        tk.Label(a_frame, text=f"RAM: {self.ram_var.get()} MB", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"]).pack(anchor="w", padx=12, pady=(8, 2))
-        self.ram_scale = tk.Scale(
-            a_frame,
-            from_=1024,
-            to=12288,
-            orient="horizontal",
-            variable=self.ram_var,
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            troughcolor=th["progress_bg"],
-            highlightthickness=0,
-            activebackground=th["accent"],
-            resolution=256,
-            command=lambda v: self.settings.set(int(float(v)), "java", "max_ram_mb"),
-        )
-        self.ram_scale.pack(fill="x", padx=12, pady=(0, 12))
+        self.show_alpha_var = QCheckBox("Alpha")
+        self.show_alpha_var.setChecked(self.settings.get("general", "show_alpha", default=False))
+        self.show_alpha_var.stateChanged.connect(self._reload_versions)
+        filter_layout.addWidget(self.show_alpha_var)
 
-        # quick play box
-        quick = tk.Frame(left, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        quick.pack(fill="x", pady=8)
-        tk.Label(quick, text="Quick Play", font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=16, pady=(12, 4))
-        qp_frame = tk.Frame(quick, bg=th["card_bg"])
-        qp_frame.pack(fill="x", padx=12, pady=8)
+        vc_layout.addLayout(filter_layout)
+        opts_layout.addWidget(ver_card)
+
+        # Account selector
+        acc_card = make_card_frame(t)
+        ac_layout = QVBoxLayout(acc_card)
+        ac_layout.setContentsMargins(12, 12, 12, 12)
+        ac_layout.setSpacing(6)
+        ac_layout.addWidget(make_section_label("Account", t, 9))
+
+        self.account_combo = QComboBox()
+        self.account_combo.currentTextChanged.connect(self._on_account_combo_changed)
+        ac_layout.addWidget(self.account_combo)
+
+        self.play_account_sub = QLabel("Offline • Steve skin")
+        self.play_account_sub.setFont(QFont("Segoe UI", 8))
+        self.play_account_sub.setStyleSheet(f"color: {t['text_muted']};")
+        ac_layout.addWidget(self.play_account_sub)
+
+        ram_label = QLabel(f"RAM: {self.settings.get('java', 'max_ram_mb', default=4096)} MB")
+        ram_label.setFont(QFont("Segoe UI", 8))
+        ram_label.setStyleSheet(f"color: {t['text_muted']};")
+        ac_layout.addWidget(ram_label)
+
+        self.ram_slider = QSlider(Qt.Orientation.Horizontal)
+        self.ram_slider.setRange(1024, 12288)
+        self.ram_slider.setSingleStep(256)
+        self.ram_slider.setValue(self.settings.get("java", "max_ram_mb", default=4096))
+        self.ram_slider.valueChanged.connect(lambda v: self._on_ram_changed(v, ram_label))
+        ac_layout.addWidget(self.ram_slider)
+
+        opts_layout.addWidget(acc_card)
+        left.addLayout(opts_layout)
+
+        # Quick play
+        qp_card = make_card_frame(t)
+        qp_layout = QVBoxLayout(qp_card)
+        qp_layout.setContentsMargins(12, 12, 12, 12)
+        qp_layout.addWidget(make_section_label("Quick Play", t, 10))
+
+        qp_btns = QHBoxLayout()
         for name in ["Vanilla Shattered", "Survival World", "Creative Test", "Latest Snapshot"]:
-            b = tk.Button(
-                qp_frame,
-                text=name,
-                font=("Segoe UI", 8),
-                bg=th["input_bg"],
-                fg=th["text_secondary"],
-                bd=0,
-                padx=8,
-                pady=6,
-                command=lambda n=name: self._quick_play(n),
-            )
-            b.pack(side="left", padx=4)
+            btn = QPushButton(name)
+            btn.setFont(QFont("Segoe UI", 8))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, n=name: self._quick_play(n))
+            qp_btns.addWidget(btn)
+        qp_layout.addLayout(qp_btns)
+        left.addWidget(qp_card)
 
-        # Right panel: favorite instances + news
-        # favorites
-        fav_header = tk.Frame(right, bg=th["bg"])
-        fav_header.pack(fill="x", pady=(0, 8))
-        tk.Label(fav_header, text="Favorites", font=("Segoe UI", 11, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(side="left")
-        tk.Button(
-            fav_header,
-            text="Manage",
-            font=("Segoe UI", 8),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            bd=0,
-            command=lambda: self._on_sidebar_select("instances"),
-        ).pack(side="right")
+        left.addStretch()
 
-        self.play_fav_frame = tk.Frame(right, bg=th["bg"])
-        self.play_fav_frame.pack(fill="x")
+        # Right column
+        right = QVBoxLayout()
+        right.setSpacing(12)
 
-        # news panel
-        news = tk.Frame(right, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        news.pack(fill="both", expand=True, pady=12)
+        # Favorites header
+        fav_hdr = QHBoxLayout()
+        fav_hdr.addWidget(make_section_label("Favorites", t, 11))
+        fav_hdr.addStretch()
+        manage_btn = QPushButton("Manage")
+        manage_btn.setFont(QFont("Segoe UI", 8))
+        manage_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        manage_btn.clicked.connect(lambda: self._on_sidebar_select("instances"))
+        fav_hdr.addWidget(manage_btn)
+        right.addLayout(fav_hdr)
 
-        tk.Label(news, text="Changelog / News", font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(12, 6))
-        txt = tk.Text(news, height=12, bg=th["input_bg"], fg=th["text_secondary"], font=("Segoe UI", 9), bd=0, wrap="word")
-        txt.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        txt.insert("1.0", "• 0.2.0: brand new UI, dark theme, sidebar, extensive settings\n• Added instance groups, favorites, quick play\n• Improved Java auto-detection\n• Console with search & filters\n• Account system with skin types\n• Appearance customization\n• File explorer bookmarks\n• Crash analyzer\n\nTip: Enable snapshots in settings to test latest features.\n\nUpdated with modern features with modrinth placeholder, file manager, and server browser ideas.")
-        txt.configure(state="disabled")
+        # Favorites list
+        self.play_fav_container = QWidget()
+        self.play_fav_layout = QVBoxLayout(self.play_fav_container)
+        self.play_fav_layout.setContentsMargins(0, 0, 0, 0)
+        self.play_fav_layout.setSpacing(6)
+        right.addWidget(self.play_fav_container)
 
-    # INSTANCES
-    def _build_instances_page(self):
-        th = self.theme
-        page = self._make_page("instances")
+        # News panel
+        news = make_card_frame(t)
+        news_layout = QVBoxLayout(news)
+        news_layout.setContentsMargins(12, 12, 12, 12)
+        news_layout.addWidget(make_section_label("Changelog / News", t, 10))
 
-        toolbar = tk.Frame(page, bg=th["header_bg"], height=56)
-        toolbar.pack(fill="x")
-        toolbar.pack_propagate(False)
-
-        tk.Label(toolbar, text="🔍", bg=th["header_bg"], fg=th["text_muted"], font=("Segoe UI", 12)).pack(side="left", padx=(16, 4))
-
-        search = tk.Entry(
-            toolbar,
-            textvariable=self.search_var,
-            bg=th["input_bg"],
-            fg=th["text_primary"],
-            insertbackground=th["text_primary"],
-            bd=0,
-            relief="flat",
-            font=("Segoe UI", 10),
+        news_text = QPlainTextEdit()
+        news_text.setReadOnly(True)
+        news_text.setFont(QFont("Segoe UI", 9))
+        news_text.setPlainText(
+            f"• {VERSION}: PySide6 GUI remake with modern dark theme\n"
+            "• Added instance groups, favorites, quick play\n"
+            "• Improved Java auto-detection\n"
+            "• Console with search & filters\n"
+            "• Account system with skin types\n"
+            "• Appearance customization\n"
+            "• File explorer bookmarks\n"
+            "• Crash analyzer\n\n"
+            "Tip: Enable snapshots in settings to test latest features.\n\n"
+            "Updated with PySide6, modern features with modrinth placeholder, file manager, and server browser ideas."
         )
-        search.pack(side="left", fill="y", pady=12, padx=4, ipadx=8)
-        search.insert(0, "")
-        search.bind("<KeyRelease>", lambda e: self._refresh_instances())
+        news_text.setMaximumHeight(200)
+        news_layout.addWidget(news_text)
 
-        # sort
-        self.sort_var = tk.StringVar(value=self.settings.get("instances", "sort_by", default="last_played"))
-        sort_combo = ttk.Combobox(toolbar, textvariable=self.sort_var, values=["last_played", "name", "version", "playtime"], width=12, state="readonly")
-        sort_combo.pack(side="left", padx=8)
-        sort_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_instances())
+        right.addWidget(news)
+        right.addStretch()
 
-        # view mode
-        self.view_mode_var = tk.StringVar(value=self.settings.get("instances", "view_mode", default="grid"))
-        tk.Button(
-            toolbar,
-            text="Grid" if self.view_mode_var.get() == "grid" else "List",
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            bd=0,
-            font=("Segoe UI", 9),
-            command=self._toggle_view_mode,
-        ).pack(side="left", padx=4)
+        # Add columns
+        left_widget = QWidget()
+        left_widget.setLayout(left)
+        right_widget = QWidget()
+        right_widget.setLayout(right)
+        right_widget.setFixedWidth(340)
 
-        # new instance
-        tk.Button(
-            toolbar,
-            text="+ New Instance",
-            bg=th["accent"],
-            fg="white",
-            bd=0,
-            font=("Segoe UI", 9, "bold"),
-            padx=14,
-            pady=6,
-            command=self._show_new_instance_dialog,
-            activebackground=th["accent_hover"],
-        ).pack(side="right", padx=16)
+        layout.addWidget(left_widget, 1)
+        layout.addWidget(right_widget)
 
-        # scroll area
-        self.instances_scroll = ScrollableFrame(page, th)
-        self.instances_scroll.pack(fill="both", expand=True, padx=16, pady=16)
+        self.play_page = outer
+        self.pages_stack.addWidget(outer)
 
-    # ACCOUNTS
+    # INSTANCES PAGE
+    def _build_instances_page(self):
+        t = self.theme
+        outer = self._make_page()
+        layout = QVBoxLayout(outer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Toolbar
+        toolbar = QFrame()
+        toolbar.setFixedHeight(56)
+        toolbar.setObjectName("header")
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(16, 0, 16, 0)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Search instances...")
+        self.search_input.setFixedWidth(250)
+        self.search_input.textChanged.connect(self._refresh_instances)
+        tb_layout.addWidget(self.search_input)
+
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItems(["last_played", "name", "version", "playtime"])
+        self.sort_combo.setCurrentText(self.settings.get("instances", "sort_by", default="last_played"))
+        self.sort_combo.currentTextChanged.connect(self._refresh_instances)
+        tb_layout.addWidget(self.sort_combo)
+
+        self.view_mode_btn = QPushButton("Grid" if self.settings.get("instances", "view_mode", default="grid") == "grid" else "List")
+        self.view_mode_btn.clicked.connect(self._toggle_view_mode)
+        tb_layout.addWidget(self.view_mode_btn)
+
+        tb_layout.addStretch()
+
+        new_btn = make_accent_button("+ New Instance", t)
+        new_btn.clicked.connect(self._show_new_instance_dialog)
+        tb_layout.addWidget(new_btn)
+
+        layout.addWidget(toolbar)
+
+        # Instances scroll area
+        self.instances_container = QWidget()
+        self.instances_container.setObjectName("scrollContent")
+        self.instances_layout = QVBoxLayout(self.instances_container)
+        self.instances_layout.setContentsMargins(16, 16, 16, 16)
+        self.instances_layout.setSpacing(8)
+        self.instances_layout.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidget(self.instances_container)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        layout.addWidget(scroll, 1)
+
+        self.instances_page = outer
+        self.pages_stack.addWidget(outer)
+
+    # ACCOUNTS PAGE
     def _build_accounts_page(self):
-        th = self.theme
-        page = self._make_page("accounts")
+        t = self.theme
+        outer = self._make_page()
+        layout = QVBoxLayout(outer)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
-        top = tk.Frame(page, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        top.pack(fill="x", padx=16, pady=16)
+        # Add account form
+        form_card = make_card_frame(t)
+        form_layout = QVBoxLayout(form_card)
+        form_layout.setContentsMargins(16, 12, 16, 12)
+        form_layout.addWidget(make_section_label("Add Offline Account", t, 11))
 
-        tk.Label(top, text="Add Offline Account", font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=16, pady=(12, 4))
+        form_row = QHBoxLayout()
+        form_row.setSpacing(8)
+        form_row.addWidget(QLabel("Username"))
 
-        form = tk.Frame(top, bg=th["card_bg"])
-        form.pack(fill="x", padx=16, pady=8)
+        self.new_account_name = QLineEdit()
+        self.new_account_name.setFixedWidth(200)
+        self.new_account_name.setPlaceholderText("3-16 characters")
+        form_row.addWidget(self.new_account_name)
 
-        self.new_account_name = tk.StringVar()
-        self.new_account_skin = tk.StringVar(value="steve")
+        self.new_account_skin = QComboBox()
+        self.new_account_skin.addItems(["steve", "alex"])
+        form_row.addWidget(self.new_account_skin)
 
-        tk.Label(form, text="Username", bg=th["card_bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(side="left")
-        ent = tk.Entry(form, textvariable=self.new_account_name, bg=th["input_bg"], fg=th["text_primary"], bd=0, insertbackground=th["text_primary"], width=24, font=("Segoe UI", 10))
-        ent.pack(side="left", padx=8, ipady=4)
+        add_btn = make_accent_button("Add Account", t)
+        add_btn.clicked.connect(self._add_account)
+        form_row.addWidget(add_btn)
+        form_row.addStretch()
 
-        ttk.Combobox(form, textvariable=self.new_account_skin, values=["steve", "alex"], width=8, state="readonly").pack(side="left", padx=8)
+        form_layout.addLayout(form_row)
+        layout.addWidget(form_card)
 
-        tk.Button(
-            form,
-            text="Add Account",
-            bg=th["accent"],
-            fg="white",
-            bd=0,
-            font=("Segoe UI", 9, "bold"),
-            command=self._add_account,
-        ).pack(side="left", padx=12)
+        # Account list
+        self.accounts_container = QWidget()
+        self.accounts_container.setObjectName("scrollContent")
+        self.accounts_layout = QVBoxLayout(self.accounts_container)
+        self.accounts_layout.setContentsMargins(0, 0, 0, 0)
+        self.accounts_layout.setSpacing(8)
+        self.accounts_layout.addStretch()
 
-        # list
-        self.accounts_scroll = ScrollableFrame(page, th)
-        self.accounts_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        scroll = QScrollArea()
+        scroll.setWidget(self.accounts_container)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        layout.addWidget(scroll, 1)
 
-    # Mods placeholder
+        self.accounts_page = outer
+        self.pages_stack.addWidget(outer)
+
+    # MODS PAGE
     def _build_mods_page(self):
-        th = self.theme
-        page = self._make_page("mods")
+        t = self.theme
+        page, inner = self._make_page_scroll()
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        tk.Label(page, text="Mods & Addons", font=("Segoe UI", 16, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 8))
-        tk.Label(
-            page,
-            text="Modrinth & CurseForge integration • Search, browse, add mods, resource packs, shaders, worlds • Dependency resolution • Conflict warnings • Enable/disable toggles",
-            font=("Segoe UI", 9),
-            bg=th["bg"],
-            fg=th["text_secondary"],
-            wraplength=800,
-            justify="left",
-        ).pack(anchor="w", padx=24)
+        layout.addWidget(make_section_label("Mods & Addons", t))
+        layout.addWidget(make_desc_label(
+            "Modrinth & CurseForge integration • Search, browse, add mods, resource packs, shaders, worlds", t))
 
-        grid = tk.Frame(page, bg=th["bg"])
-        grid.pack(fill="both", expand=True, padx=16, pady=16)
-
+        grid = QHBoxLayout()
+        grid.setSpacing(12)
         for mod_type in ["Mods", "Resource Packs", "Shaders", "Data Packs", "Worlds"]:
-            card = tk.Frame(grid, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"], width=180, height=140)
-            card.pack(side="left", padx=8, pady=8)
-            card.pack_propagate(False)
-            tk.Label(card, text=mod_type, font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(pady=(24, 4))
-            tk.Label(card, text="Browse →", font=("Segoe UI", 9), bg=th["card_bg"], fg=th["accent"]).pack()
-            tk.Label(card, text="Coming soon", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"]).pack(pady=8)
-            # fake stats
-            tk.Label(card, text="0 installed", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"]).pack(side="bottom", pady=12)
+            card = make_card_frame(t)
+            card.setFixedSize(170, 130)
+            c_layout = QVBoxLayout(card)
+            c_layout.setContentsMargins(12, 16, 12, 12)
+            c_layout.addWidget(make_section_label(mod_type, t, 11))
+            browse = QLabel("Browse →")
+            browse.setStyleSheet(f"color: {t['accent']}; background: transparent;")
+            c_layout.addWidget(browse)
+            c_layout.addWidget(make_desc_label("Coming soon", t))
+            c_layout.addStretch()
+            grid.addWidget(card)
+        grid.addStretch()
+        layout.addLayout(grid)
 
-        # features with modern features mentions
-        feat = tk.Frame(page, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        feat.pack(fill="x", padx=16, pady=16)
-        tk.Label(feat, text="Planned Features (with modern features)", font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=16, pady=(12, 4))
+        # Features list
+        feat = make_card_frame(t)
+        feat_layout = QVBoxLayout(feat)
+        feat_layout.setContentsMargins(16, 12, 16, 12)
+        feat_layout.addWidget(make_section_label("Planned Features", t, 11))
         for bullet in [
             "• Auto-resolve dependencies from Modrinth",
             "• One-click install to any instance",
@@ -697,224 +744,382 @@ class OmniLauncherApp:
             "• Fractureiser malware scanner",
             "• Parallel downloads, GPU acceleration",
         ]:
-            tk.Label(feat, text=bullet, font=("Segoe UI", 9), bg=th["card_bg"], fg=th["text_secondary"], anchor="w").pack(anchor="w", padx=24, pady=2)
-        tk.Label(feat, text="", bg=th["card_bg"]).pack(pady=4)
+            feat_layout.addWidget(make_desc_label(bullet, t))
+        layout.addWidget(feat)
+        layout.addStretch()
 
+        self.mods_page = page
+        self.pages_stack.addWidget(page)
+
+    # EXPLORER PAGE
     def _build_explorer_page(self):
-        th = self.theme
-        page = self._make_page("explorer")
-        tk.Label(page, text="File Explorer", font=("Segoe UI", 16, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 8))
-        tk.Label(page, text="Built-in file explorer with modern features - navigate, rename, delete, drag-drop, bookmarks for quick access to screenshots, worlds, logs", font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"], wraplength=800, justify="left").pack(anchor="w", padx=24)
+        t = self.theme
+        outer = self._make_page()
+        layout = QVBoxLayout(outer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        split = tk.Frame(page, bg=th["bg"])
-        split.pack(fill="both", expand=True, padx=16, pady=8)
+        # Title bar
+        title_bar = QFrame()
+        title_bar.setObjectName("header")
+        title_bar.setFixedHeight(48)
+        tl = QHBoxLayout(title_bar)
+        tl.setContentsMargins(16, 0, 16, 0)
+        tl.addWidget(make_section_label("File Explorer", t, 14))
+        tl.addStretch()
 
-        # bookmarks left
-        bm_frame = tk.Frame(split, bg=th["sidebar_bg"], width=180)
-        bm_frame.pack(side="left", fill="y", padx=4)
-        bm_frame.pack_propagate(False)
-        tk.Label(bm_frame, text="Bookmarks", font=("Segoe UI", 10, "bold"), bg=th["sidebar_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=8)
+        self.explorer_path_label = QLabel(self.settings.minecraft_dir)
+        self.explorer_path_label.setFont(QFont("Segoe UI", 9))
+        self.explorer_path_label.setStyleSheet(f"color: {t['text_secondary']};")
+        tl.addWidget(self.explorer_path_label)
 
-        self.explorer_bm_buttons = []
-        self.explorer_current_path_var = tk.StringVar(value=self.settings.minecraft_dir if hasattr(self, 'settings') else "")
-        self.explorer_file_list = None
+        up_btn = make_toolbar_button("↑ Up", t)
+        up_btn.clicked.connect(self._explorer_go_up)
+        tl.addWidget(up_btn)
 
-        # right list
-        right = tk.Frame(split, bg=th["bg"])
-        right.pack(side="left", fill="both", expand=True, padx=8)
+        refresh_btn = make_toolbar_button("Refresh", t)
+        refresh_btn.clicked.connect(self._refresh_explorer)
+        tl.addWidget(refresh_btn)
 
-        top_bar = tk.Frame(right, bg=th["header_bg"], height=40)
-        top_bar.pack(fill="x")
-        top_bar.pack_propagate(False)
-        tk.Label(top_bar, textvariable=self.explorer_current_path_var, font=("Segoe UI", 9), bg=th["header_bg"], fg=th["text_secondary"]).pack(side="left", padx=12)
-        tk.Button(top_bar, text="Open in OS", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=lambda: open_folder(self.explorer_current_path_var.get())).pack(side="right", padx=8, pady=6)
-        tk.Button(top_bar, text="↑ Up", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._explorer_go_up).pack(side="right", padx=4, pady=6)
-        tk.Button(top_bar, text="Refresh", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._refresh_explorer).pack(side="right", padx=4, pady=6)
+        os_btn = make_toolbar_button("Open in OS", t)
+        os_btn.clicked.connect(lambda: open_folder(self.explorer_current_path))
+        tl.addWidget(os_btn)
 
-        # scrollable list
-        self.explorer_scroll = ScrollableFrame(right, th)
-        self.explorer_scroll.pack(fill="both", expand=True)
+        layout.addWidget(title_bar)
 
-        # initial bookmark render done in refresh
-        def _open_bm(path):
-            self.explorer_current_path_var.set(path)
-            self._refresh_explorer()
+        # Content splitter
+        content = QSplitter(Qt.Orientation.Horizontal)
+        content.setHandleWidth(2)
 
-        # populate bookmark buttons after UI
-        self._explorer_bookmark_opener = _open_bm
-        self.root.after(200, lambda: self._refresh_explorer_bookmarks())
+        # Bookmarks
+        bm_widget = QWidget()
+        bm_widget.setFixedWidth(180)
+        bm_layout = QVBoxLayout(bm_widget)
+        bm_layout.setContentsMargins(12, 12, 12, 12)
+        bm_layout.addWidget(make_section_label("Bookmarks", t, 10))
 
-        # also refresh files
-        self.root.after(300, self._refresh_explorer)
+        self.explorer_current_path = self.settings.minecraft_dir
 
-    def _refresh_explorer_bookmarks(self):
         try:
-            th = self.theme
-            # find bm_frame by walking? We have split first child left is bm_frame but we stored?
-            # Let's recreate by searching pages['explorer']
-            page = self.pages.get("explorer")
-            if not page:
-                return
-            # locate bm_frame: it's first child of split which is second child of page? Simpler: we re-build bookmarks
             from omnilauncher.services.file_explorer import get_bookmarks
-            mc_dir = self.settings.minecraft_dir
-            bookmarks = get_bookmarks(mc_dir)
-            # find existing bm_frame - we need to locate via children
-            # The bm_frame is .winfo_children of split after explorer page; split is .winfo_children of page[?]
-            # We'll just repopulate if we have stored method
-            # For now we do manual: search for Frame with bg sidebar
-            # Let's just create buttons in existing page's first frame
-            # To avoid complexity, we directly create in explorer page if not exists
-            # We'll store bookmarks for UI: use messagebox or just create
-            pass
+            for bm in get_bookmarks(self.settings.minecraft_dir):
+                btn = QPushButton(f"{bm['icon']}  {bm['name']}")
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: transparent;
+                        color: {t['text_secondary'] if bm['exists'] else t['text_muted']};
+                        border: none;
+                        text-align: left;
+                        padding: 6px 8px;
+                        border-radius: 6px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {t['sidebar_hover']};
+                        color: {t['text_primary']};
+                    }}
+                """)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.clicked.connect(lambda checked, p=bm['path']: self._explorer_navigate(p))
+                bm_layout.addWidget(btn)
         except Exception:
             pass
+        bm_layout.addStretch()
+
+        content.addWidget(bm_widget)
+
+        # File list
+        self.explorer_list = QListWidget()
+        self.explorer_list.setFont(QFont("Segoe UI", 10))
+        self.explorer_list.itemDoubleClicked.connect(self._explorer_double_click)
+        content.addWidget(self.explorer_list)
+
+        layout.addWidget(content, 1)
+
+        self.explorer_page = outer
+        self.pages_stack.addWidget(outer)
+
+        QTimer.singleShot(300, self._refresh_explorer)
+
+    def _explorer_navigate(self, path: str):
+        self.explorer_current_path = path
+        self.explorer_path_label.setText(path)
+        self._refresh_explorer()
 
     def _refresh_explorer(self):
-        th = self.theme
-        path = self.explorer_current_path_var.get() or self.settings.minecraft_dir
-        if not hasattr(self, 'explorer_scroll') or not self.explorer_scroll.winfo_exists():
-            return
-        for w in self.explorer_scroll.inner.winfo_children():
-            w.destroy()
         try:
-            from omnilauncher.services.file_explorer import list_files
-            items = list_files(path)
+            items = list_files(self.explorer_current_path)
+            self.explorer_list.clear()
+            self._explorer_items = items
             if not items:
-                tk.Label(self.explorer_scroll.inner, text="Folder empty or not found. Creating...", bg=th["bg"], fg=th["text_muted"]).pack(pady=20)
+                self.explorer_list.addItem("Folder empty or not found")
                 return
             for it in items:
-                row = tk.Frame(self.explorer_scroll.inner, bg=th["card_bg"])
-                row.pack(fill="x", padx=4, pady=2)
-                icon = "📁" if it["is_dir"] else "📄"
-                tk.Label(row, text=f"{icon}  {it['name']}", font=("Segoe UI", 9), bg=th["card_bg"], fg=th["text_primary"], anchor="w").pack(side="left", padx=8, pady=6)
-                tk.Label(row, text=f"{it['size']} bytes", font=("Segoe UI", 7), bg=th["card_bg"], fg=th["text_muted"]).pack(side="right", padx=8)
-                # bind double click
-                def open_it(p=it["path"], is_dir=it["is_dir"]):
-                    if is_dir:
-                        self.explorer_current_path_var.set(p)
-                        self._refresh_explorer()
-                row.bind("<Double-Button-1>", lambda e, p=it["path"], d=it["is_dir"]: open_it(p, d))
-                for child in row.winfo_children():
-                    child.bind("<Double-Button-1>", lambda e, p=it["path"], d=it["is_dir"]: open_it(p, d))
+                prefix = "📁" if it["is_dir"] else "📄"
+                text = f"{prefix}  {it['name']}/" if it["is_dir"] else f"{prefix}  {it['name']}  ({it['size']} bytes)"
+                self.explorer_list.addItem(text)
         except Exception as e:
-            tk.Label(self.explorer_scroll.inner, text=f"Error: {e}", bg=th["bg"], fg=th["error"]).pack()
+            self.explorer_list.clear()
+            self.explorer_list.addItem(f"Error: {e}")
+
+    def _explorer_double_click(self, item: QListWidgetItem):
+        idx = self.explorer_list.row(item)
+        if hasattr(self, '_explorer_items') and 0 <= idx < len(self._explorer_items):
+            it = self._explorer_items[idx]
+            if it["is_dir"]:
+                self.explorer_current_path = it["path"]
+                self.explorer_path_label.setText(it["path"])
+                self._refresh_explorer()
 
     def _explorer_go_up(self):
-        from pathlib import Path
-        curr = self.explorer_current_path_var.get()
-        parent = str(Path(curr).parent)
-        # prevent going above minecraft dir too far
+        parent = str(Path(self.explorer_current_path).parent)
         if len(parent) >= 3:
-            self.explorer_current_path_var.set(parent)
+            self.explorer_current_path = parent
+            self.explorer_path_label.setText(parent)
             self._refresh_explorer()
 
+    # SERVERS PAGE
     def _build_servers_page(self):
-        th = self.theme
-        page = self._make_page("servers")
-        tk.Label(page, text="Server Browser", font=("Segoe UI", 16, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 8))
-        tk.Label(page, text="Experimental with modern features - search, filter, sort servers, check player counts, join directly. Inspired by live server browser.", font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"], wraplength=800, justify="left").pack(anchor="w", padx=24)
+        t = self.theme
+        page, inner = self._make_page_scroll()
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        toolbar = tk.Frame(page, bg=th["header_bg"], height=48)
-        toolbar.pack(fill="x", padx=16, pady=12)
-        toolbar.pack_propagate(False)
-        tk.Label(toolbar, text="🔍", bg=th["header_bg"], fg=th["text_muted"]).pack(side="left", padx=12)
-        tk.Entry(toolbar, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=30).pack(side="left", pady=10)
-        ttk.Combobox(toolbar, values=["All", "Survival", "Creative", "Minigames", "PvP", "Vanilla"], width=12, state="readonly").pack(side="left", padx=8)
-        tk.Button(toolbar, text="Refresh", bg=th["card_bg"], fg=th["text_secondary"], bd=0).pack(side="right", padx=12)
+        layout.addWidget(make_section_label("Server Browser", t))
+        layout.addWidget(make_desc_label(
+            "Experimental • Search, filter, sort servers, check player counts, join directly.", t))
 
-        # fake server list
-        scroll = ScrollableFrame(page, th)
-        scroll.pack(fill="both", expand=True, padx=16, pady=8)
+        # Search toolbar
+        toolbar = QFrame()
+        toolbar.setObjectName("header")
+        toolbar.setFixedHeight(48)
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(12, 0, 12, 0)
 
+        search = QLineEdit()
+        search.setPlaceholderText("🔍 Search servers...")
+        tb_layout.addWidget(search)
+
+        filter_combo = QComboBox()
+        filter_combo.addItems(["All", "Survival", "Creative", "Minigames", "PvP", "Vanilla"])
+        tb_layout.addWidget(filter_combo)
+
+        refresh_btn = make_toolbar_button("Refresh", t)
+        tb_layout.addWidget(refresh_btn)
+        layout.addWidget(toolbar)
+
+        # Fake servers
         servers = [
             {"name": "Hypixel", "ip": "mc.hypixel.net", "players": "45,231/100,000", "ping": "42ms", "version": "1.8-1.21", "motd": "The world's largest Minecraft server"},
             {"name": "Mineplex", "ip": "us.mineplex.com", "players": "12,442/30,000", "ping": "67ms", "version": "1.8-1.20", "motd": "Clans, Bridges, Survival"},
             {"name": "CubeCraft", "ip": "play.cubecraft.net", "players": "8,921/20,000", "ping": "89ms", "version": "1.9-1.21", "motd": "EggWars, SkyWars, BlockWars"},
             {"name": "Local LAN World", "ip": "192.168.1.10:25565", "players": "1/8", "ping": "12ms", "version": "1.21.1", "motd": "My survival world — open to LAN"},
         ]
+
         for srv in servers:
-            card = tk.Frame(scroll.inner, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-            card.pack(fill="x", pady=6)
-            left = tk.Frame(card, bg=th["card_bg"])
-            left.pack(side="left", fill="y", padx=12, pady=10)
-            tk.Label(left, text=srv["name"], font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w")
-            tk.Label(left, text=f"{srv['ip']} • {srv['players']} • {srv['ping']} • {srv['version']}", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"]).pack(anchor="w")
-            tk.Label(left, text=srv["motd"], font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"], wraplength=400, justify="left").pack(anchor="w", pady=2)
-            tk.Button(card, text="Join", bg=th["accent"], fg="white", bd=0, font=("Segoe UI", 9, "bold"), padx=16, pady=4, command=lambda ip=srv["ip"]: self._join_server(ip)).pack(side="right", padx=16, pady=16)
+            card = make_card_frame(t)
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+
+            text = QVBoxLayout()
+            text.setSpacing(3)
+            name = QLabel(srv["name"])
+            name.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            name.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+            text.addWidget(name)
+
+            info = QLabel(f"{srv['ip']} • {srv['players']} • {srv['ping']} • {srv['version']}")
+            info.setFont(QFont("Segoe UI", 8))
+            info.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+            text.addWidget(info)
+
+            motd = QLabel(srv["motd"])
+            motd.setFont(QFont("Segoe UI", 8))
+            motd.setStyleSheet(f"color: {t['text_muted']}; background: transparent;")
+            text.addWidget(motd)
+
+            card_layout.addLayout(text, 1)
+
+            join_btn = make_accent_button("Join", t)
+            join_btn.clicked.connect(lambda checked, ip=srv["ip"]: self._join_server(ip))
+            card_layout.addWidget(join_btn)
+
+            layout.addWidget(card)
+
+        layout.addStretch()
+        self.servers_page = page
+        self.pages_stack.addWidget(page)
 
     def _join_server(self, ip: str):
-        messagebox.showinfo("Join Server", f"Would join {ip} — sets auto-connect in Game settings and launches.\n(Feature placeholder with modern features experimental)")
+        QMessageBox.information(self, "Join Server",
+                                f"Would join {ip} — sets auto-connect in Game settings and launches.\n(Feature placeholder)")
 
+    # FRIENDS PAGE
     def _build_friends_page(self):
-        th = self.theme
-        page = self._make_page("friends")
-        tk.Label(page, text="Friends List [Experimental]", font=("Segoe UI", 16, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 8))
-        tk.Label(page, text="Experimental: only for Microsoft accounts, disabled by default. only for Microsoft accounts, disabled by default, enable in settings. See who is online, send invitations, manage status.", font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"], wraplength=800, justify="left").pack(anchor="w", padx=24)
+        t = self.theme
+        page, inner = self._make_page_scroll()
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        # toggle
-        toggle_frame = tk.Frame(page, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        toggle_frame.pack(fill="x", padx=16, pady=12)
-        tk.Label(toggle_frame, text="Friends List is disabled by default (experimental). Enable in Settings > General > Enable Analytics? No, in Network? Placeholder.", font=("Segoe UI", 9), bg=th["card_bg"], fg=th["text_secondary"]).pack(anchor="w", padx=16, pady=8)
-        tk.Button(toggle_frame, text="Enable Friends List", bg=th["card_bg"], fg=th["accent"], bd=0, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=16, pady=(0, 12))
+        layout.addWidget(make_section_label("Friends List [Experimental]", t))
+        layout.addWidget(make_desc_label(
+            "Experimental: only for Microsoft accounts, disabled by default. See who is online, send invitations, manage status.", t))
 
-        # fake friends
-        scroll = ScrollableFrame(page, th)
-        scroll.pack(fill="both", expand=True, padx=16, pady=8)
-        for name, status, game in [("Alex", "Online", "Playing Hypixel"), ("Notch", "Offline", ""), ("Dinnerbone", "Online", "In menu"), ("Steve", "Online", "Playing Local World")]:
-            row = tk.Frame(scroll.inner, bg=th["card_bg"])
-            row.pack(fill="x", pady=4)
-            tk.Label(row, text="●" if status == "Online" else "○", font=("Segoe UI", 10), bg=th["card_bg"], fg=th["success"] if status == "Online" else th["text_muted"]).pack(side="left", padx=8)
-            tk.Label(row, text=name, font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(side="left")
-            tk.Label(row, text=status, font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"]).pack(side="left", padx=8)
-            tk.Label(row, text=game, font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"]).pack(side="left", padx=8)
+        toggle = make_card_frame(t)
+        toggle_layout = QVBoxLayout(toggle)
+        toggle_layout.setContentsMargins(16, 12, 16, 12)
+        toggle_layout.addWidget(make_desc_label(
+            "Friends List is disabled by default (experimental). Enable in Settings.", t))
+        enable_btn = QPushButton("Enable Friends List")
+        enable_btn.setStyleSheet(f"color: {t['accent']}; background: transparent; border: none; font-weight: bold;")
+        enable_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        toggle_layout.addWidget(enable_btn)
+        layout.addWidget(toggle)
+
+        # Fake friends
+        for name, status, game in [("Alex", "Online", "Playing Hypixel"), ("Notch", "Offline", ""),
+                                    ("Dinnerbone", "Online", "In menu"), ("Steve", "Online", "Playing Local World")]:
+            row = make_card_frame(t)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(12, 8, 12, 8)
+
+            dot = QLabel("●" if status == "Online" else "○")
+            dot.setStyleSheet(f"color: {t['success'] if status == 'Online' else t['text_muted']}; background: transparent;")
+            row_layout.addWidget(dot)
+
+            n = QLabel(name)
+            n.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            n.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+            row_layout.addWidget(n)
+
+            s = QLabel(status)
+            s.setFont(QFont("Segoe UI", 8))
+            s.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+            row_layout.addWidget(s)
+
+            g = QLabel(game)
+            g.setFont(QFont("Segoe UI", 8))
+            g.setStyleSheet(f"color: {t['text_muted']}; background: transparent;")
+            row_layout.addWidget(g)
+
+            row_layout.addStretch()
+
             if status == "Online":
-                tk.Button(row, text="Invite", font=("Segoe UI", 8), bg=th["accent_secondary"], fg="white", bd=0, padx=8).pack(side="right", padx=8)
+                inv = QPushButton("Invite")
+                inv.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {t['accent_secondary']};
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        padding: 4px 12px;
+                        font-size: 11px;
+                    }}
+                    QPushButton:hover {{ opacity: 0.8; }}
+                """)
+                row_layout.addWidget(inv)
 
+            layout.addWidget(row)
+
+        layout.addStretch()
+        self.friends_page = page
+        self.pages_stack.addWidget(page)
+
+    # SKINS PAGE
     def _build_skins_page(self):
-        th = self.theme
-        page = self._make_page("skins")
-        tk.Label(page, text="Skins & Capes", font=("Segoe UI", 16, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 8))
+        t = self.theme
+        outer = self._make_page()
+        layout = QHBoxLayout(outer)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
-        split = tk.Frame(page, bg=th["bg"])
-        split.pack(fill="both", expand=True, padx=16, pady=8)
+        # Preview
+        preview = make_card_frame(t)
+        preview.setFixedWidth(300)
+        preview_layout = QVBoxLayout(preview)
+        preview_layout.setContentsMargins(16, 16, 16, 16)
+        preview_layout.addWidget(make_section_label("Skin Preview", t, 11))
 
-        preview = tk.Frame(split, bg=th["card_bg"], width=300, highlightthickness=1, highlightbackground=th["card_border"])
-        preview.pack(side="left", fill="y", padx=8)
-        preview.pack_propagate(False)
-        tk.Label(preview, text="Skin Preview", font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(pady=12)
-        self.skin_canvas = tk.Canvas(preview, width=200, height=280, bg=th["input_bg"], highlightthickness=0)
-        self.skin_canvas.pack(pady=8)
-        # draw placeholder
-        self._draw_skin_preview("steve")
+        self.skin_preview = QLabel("Steve\n(classic)")
+        self.skin_preview.setFixedSize(200, 260)
+        self.skin_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.skin_preview.setStyleSheet(f"""
+            QLabel {{
+                background-color: {t['input_bg']};
+                border-radius: 12px;
+                color: {t['text_muted']};
+                font-size: 12px;
+            }}
+        """)
+        preview_layout.addWidget(self.skin_preview, 0, Qt.AlignmentFlag.AlignCenter)
+        preview_layout.addStretch()
 
-        opts = tk.Frame(split, bg=th["bg"])
-        opts.pack(side="left", fill="both", expand=True, padx=16)
+        # Options
+        opts = QVBoxLayout()
+        opts.setSpacing(12)
 
-        tk.Label(opts, text="Current Account", font=("Segoe UI", 10, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w")
-        self.skin_account_label = tk.Label(opts, text="Steve • Offline", font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"])
-        self.skin_account_label.pack(anchor="w", pady=4)
+        opts.addWidget(make_section_label("Skins & Capes", t))
+        opts.addWidget(make_section_label("Current Account", t, 10))
+        self.skin_account_label = QLabel("Steve • Offline")
+        self.skin_account_label.setFont(QFont("Segoe UI", 9))
+        self.skin_account_label.setStyleSheet(f"color: {t['text_secondary']};")
+        opts.addWidget(self.skin_account_label)
 
-        tk.Label(opts, text="Skin Model", font=("Segoe UI", 10, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", pady=(16, 4))
-        self.skin_type_var = tk.StringVar(value="steve")
-        ttk.Combobox(opts, textvariable=self.skin_type_var, values=["steve", "alex"], state="readonly", width=12).pack(anchor="w")
-        tk.Button(opts, text="Apply Skin Type", bg=th["card_bg"], fg=th["text_primary"], bd=0, command=self._apply_skin_type).pack(anchor="w", pady=8)
+        opts.addWidget(make_section_label("Skin Model", t, 10))
+        self.skin_type_combo = QComboBox()
+        self.skin_type_combo.addItems(["steve", "alex"])
+        opts.addWidget(self.skin_type_combo)
 
-        tk.Label(opts, text="Cape", font=("Segoe UI", 10, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", pady=(16, 4))
-        tk.Label(opts, text="Cape support with modern upload or select from library", font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"], wraplength=400).pack(anchor="w")
-        tk.Button(opts, text="Open Skins Folder", bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=lambda: open_folder(os.path.join(self.settings.minecraft_dir, "skins"))).pack(anchor="w", pady=8)
+        apply_btn = QPushButton("Apply Skin Type")
+        apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        apply_btn.clicked.connect(self._apply_skin_type)
+        opts.addWidget(apply_btn)
 
-    # SETTINGS - extensive
+        opts.addWidget(make_section_label("Cape", t, 10))
+        opts.addWidget(make_desc_label("Cape support with upload or select from library", t))
+
+        open_skins = QPushButton("Open Skins Folder")
+        open_skins.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_skins.clicked.connect(lambda: open_folder(os.path.join(self.settings.minecraft_dir, "skins")))
+        opts.addWidget(open_skins)
+
+        opts.addStretch()
+
+        layout.addWidget(preview)
+        opts_widget = QWidget()
+        opts_widget.setLayout(opts)
+        layout.addWidget(opts_widget, 1)
+
+        self.skins_page = outer
+        self.pages_stack.addWidget(outer)
+
+    def _apply_skin_type(self):
+        st = self.skin_type_combo.currentText()
+        self.skin_preview.setText(f"{st.capitalize()}\n({'slim' if st == 'alex' else 'classic'})")
+        idx = self.settings.get("accounts", "selected_index", default=0)
+        accs = self.settings.get("accounts", "list", default=[])
+        if 0 <= idx < len(accs):
+            accs[idx]["skin_type"] = st
+            self.settings.save()
+            self._refresh_accounts()
+            QMessageBox.information(self, "Skin", f"Skin type set to {st}")
+
+    # SETTINGS PAGE
     def _build_settings_page(self):
-        th = self.theme
-        page = self._make_page("settings")
+        t = self.theme
+        outer = self._make_page()
+        layout = QHBoxLayout(outer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # left sub-nav
-        left_nav = tk.Frame(page, bg=th["sidebar_bg"], width=200)
-        left_nav.pack(side="left", fill="y")
-        left_nav.pack_propagate(False)
-
-        tk.Label(left_nav, text="Settings", font=("Segoe UI", 12, "bold"), bg=th["sidebar_bg"], fg=th["text_primary"]).pack(anchor="w", padx=16, pady=(16, 8))
+        # Left nav
+        left_nav = QFrame()
+        left_nav.setFixedWidth(200)
+        left_nav.setStyleSheet(f"background-color: {t['sidebar_bg']};")
+        nav_layout = QVBoxLayout(left_nav)
+        nav_layout.setContentsMargins(12, 16, 12, 12)
+        nav_layout.addWidget(make_section_label("Settings", t, 12))
 
         self.settings_nav_buttons = {}
         settings_sections = [
@@ -926,35 +1131,37 @@ class OmniLauncherApp:
             ("launcher", "🖥 Launcher"),
             ("advanced", "🧪 Advanced"),
         ]
+
         for key, label in settings_sections:
-            b = tk.Button(
-                left_nav,
-                text=label,
-                anchor="w",
-                font=("Segoe UI", 10),
-                bg=th["sidebar_bg"],
-                fg=th["text_secondary"],
-                bd=0,
-                padx=16,
-                pady=10,
-                activebackground=th["sidebar_hover"],
-                command=lambda k=key: self._show_settings_subpage(k),
-            )
-            b.pack(fill="x", padx=6, pady=2)
-            self.settings_nav_buttons[key] = b
+            btn = QPushButton(label)
+            btn.setFont(QFont("Segoe UI", 10))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {t['text_secondary']};
+                    border: none;
+                    border-radius: 8px;
+                    text-align: left;
+                    padding: 10px 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: {t['sidebar_hover']};
+                    color: {t['text_primary']};
+                }}
+            """)
+            btn.clicked.connect(lambda checked, k=key: self._show_settings_subpage(k))
+            nav_layout.addWidget(btn)
+            self.settings_nav_buttons[key] = btn
 
-        # right content scroll
-        right = tk.Frame(page, bg=th["bg"])
-        right.pack(side="right", fill="both", expand=True)
+        nav_layout.addStretch()
+        layout.addWidget(left_nav)
 
-        self.settings_scroll = ScrollableFrame(right, th)
-        self.settings_scroll.pack(fill="both", expand=True)
+        # Right content
+        self.settings_stack = QStackedWidget()
+        layout.addWidget(self.settings_stack, 1)
 
-        # create subpages containers inside inner frame
-        for sec_key, _ in settings_sections:
-            f = tk.Frame(self.settings_scroll.inner, bg=th["bg"])
-            self.settings_subpages[sec_key] = f
-
+        # Build sub-pages
         self._build_settings_general()
         self._build_settings_java()
         self._build_settings_game()
@@ -965,107 +1172,81 @@ class OmniLauncherApp:
 
         self._show_settings_subpage("general")
 
-    def _settings_section_title(self, parent, title, desc):
-        th = self.theme
-        tk.Label(parent, text=title, font=("Segoe UI", 14, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(anchor="w", padx=24, pady=(24, 4))
-        tk.Label(parent, text=desc, font=("Segoe UI", 9), bg=th["bg"], fg=th["text_secondary"], wraplength=600, justify="left").pack(anchor="w", padx=24, pady=(0, 12))
-        tk.Frame(parent, bg=th["separator"], height=1).pack(fill="x", padx=24, pady=8)
+        self.settings_page = outer
+        self.pages_stack.addWidget(outer)
 
-    def _settings_row(self, parent, title, desc, widget):
-        th = self.theme
-        row = tk.Frame(parent, bg=th["card_bg"])
-        row.pack(fill="x", padx=24, pady=6)
+    def _make_settings_page(self) -> QWidget:
+        """Create a scrollable settings sub-page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(8)
+        return page
 
-        left = tk.Frame(row, bg=th["card_bg"])
-        left.pack(side="left", fill="x", expand=True, padx=16, pady=12)
-        tk.Label(left, text=title, font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"], anchor="w").pack(anchor="w")
-        tk.Label(left, text=desc, font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], wraplength=380, justify="left", anchor="w").pack(anchor="w", pady=(2, 0))
+    def _add_settings_row(self, parent_layout: QVBoxLayout, title: str, desc: str,
+                          control: QWidget | None = None):
+        """Add a settings row with title, description, and optional control."""
+        t = self.theme
+        row = QFrame()
+        row.setStyleSheet(f"background-color: {t['card_bg']}; border-radius: 8px;")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(16, 12, 16, 12)
+        row_layout.setSpacing(16)
 
-        right = tk.Frame(row, bg=th["card_bg"])
-        right.pack(side="right", padx=16, pady=4, fill="y")
+        text = QVBoxLayout()
+        text.setSpacing(4)
+        tl = QLabel(title)
+        tl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        tl.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+        text.addWidget(tl)
+        dl = QLabel(desc)
+        dl.setFont(QFont("Segoe UI", 8))
+        dl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+        dl.setWordWrap(True)
+        text.addWidget(dl)
+        row_layout.addLayout(text, 1)
 
-        if widget is not None:
-            try:
-                # try to reconfigure bg if possible
-                widget.configure(bg=th["card_bg"])
-            except Exception:
-                try:
-                    widget.configure(bg=th["input_bg"])
-                except Exception:
-                    pass
+        if control is not None:
+            row_layout.addWidget(control)
 
-            # Robust packing: handle wrapper Frame cases that caused TclError
-            # If widget is a Checkbutton inside a wrapper Frame(parent), we pack wrapper into right
-            try:
-                # If widget parent is not right and is a Frame whose parent is the settings page (parent param),
-                # then we should pack that wrapper Frame into right, and ensure widget is packed inside wrapper.
-                master = widget.master
-                if isinstance(master, tk.Frame) and master.master == parent and master != parent:
-                    # wrapper case: widget inside wrapper Frame(p)
-                    try:
-                        if not widget.winfo_ismapped():
-                            widget.pack(side="left", padx=2)
-                    except Exception:
-                        pass
-                    try:
-                        master.pack(in_=right, side="left")
-                    except tk.TclError:
-                        # fallback: pack master directly without in_
-                        try:
-                            master.pack(side="left")
-                            # try again to place master into right via right being parent? Use pack with right as parent via in_ if fails, just pack
-                            right_inner = tk.Frame(right, bg=th["card_bg"])
-                            right_inner.pack()
-                            master.pack(in_=right_inner)
-                        except Exception:
-                            try:
-                                master.pack(side="left")
-                            except Exception:
-                                pass
-                else:
-                    # Normal case: widget parent is parent or frame_dir etc. Try in_=right, fallback to side left
-                    try:
-                        widget.pack(in_=right, side="left")
-                    except tk.TclError:
-                        try:
-                            # If widget is Frame (like frame_dir containing entries), pack it into right
-                            widget.pack(in_=right, side="left")
-                        except tk.TclError:
-                            # final fallback: if widget already has parent, try to pack its parent
-                            try:
-                                widget.pack(side="left")
-                            except Exception:
-                                pass
-            except Exception:
-                try:
-                    widget.pack(side="left")
-                except Exception:
-                    pass
+        parent_layout.addWidget(row)
 
-        sep = tk.Frame(parent, bg=th["separator"], height=1)
-        sep.pack(fill="x", padx=24)
+    def _add_settings_section(self, parent_layout: QVBoxLayout, title: str, desc: str):
+        t = self.theme
+        parent_layout.addWidget(make_section_label(title, t, 14))
+        parent_layout.addWidget(make_desc_label(desc, t))
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {t['separator']};")
+        parent_layout.addWidget(sep)
 
     def _build_settings_general(self):
-        th = self.theme
-        p = self.settings_subpages["general"]
-        self._settings_section_title(p, "General", "Base launcher behavior, updates, minecraft folder, version filters.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        # lang
-        var_lang = tk.StringVar(value=self.settings.get("general", "language", default="en_US"))
-        combo = ttk.Combobox(p, textvariable=var_lang, values=["en_US", "es_ES", "fr_FR", "de_DE", "pt_BR", "ru_RU"], state="readonly", width=18)
-        combo.bind("<<ComboboxSelected>>", lambda e: (self.settings.set(var_lang.get(), "general", "language"), self.settings.save()))
-        self._settings_row(p, "Language", "Interface language. Restart required.", combo)
+        self._add_settings_section(layout, "General", "Base launcher behavior, updates, minecraft folder, version filters.")
 
-        # mc dir
-        frame_dir = tk.Frame(p, bg=th["card_bg"])
-        ent_dir = tk.Entry(frame_dir, bg=th["input_bg"], fg=th["text_primary"], bd=0, insertbackground=th["text_primary"], width=36)
-        ent_dir.insert(0, self.settings.get("general", "minecraft_directory", default=self.settings.minecraft_dir))
-        btn_browse = tk.Button(frame_dir, text="Browse", bg=th["input_bg"], fg=th["text_secondary"], bd=0, font=("Segoe UI", 8), command=lambda: self._browse_folder(ent_dir))
-        ent_dir.pack(side="left", padx=4)
-        btn_browse.pack(side="left", padx=4)
-        self._settings_row(p, "Minecraft Directory", "Folder where Minecraft stores worlds, mods, etc. Custom per-instance possible.", frame_dir)
+        # Language
+        lang_combo = QComboBox()
+        lang_combo.addItems(["en_US", "es_ES", "fr_FR", "de_DE", "pt_BR", "ru_RU"])
+        lang_combo.setCurrentText(self.settings.get("general", "language", default="en_US"))
+        lang_combo.currentTextChanged.connect(lambda v: (self.settings.set(v, "general", "language"), self.settings.save()))
+        self._add_settings_row(layout, "Language", "Interface language. Restart required.", lang_combo)
 
-        # version toggles - fixed: directly create checkbutton without wrapper to avoid TclError
+        # MC dir
+        dir_widget = QWidget()
+        dir_layout = QHBoxLayout(dir_widget)
+        dir_layout.setContentsMargins(0, 0, 0, 0)
+        self.mc_dir_edit = QLineEdit(self.settings.get("general", "minecraft_directory", default=self.settings.minecraft_dir))
+        self.mc_dir_edit.setFixedWidth(300)
+        dir_layout.addWidget(self.mc_dir_edit)
+        browse_btn = QPushButton("Browse")
+        browse_btn.clicked.connect(self._browse_mc_dir)
+        dir_layout.addWidget(browse_btn)
+        self._add_settings_row(layout, "Minecraft Directory", "Folder where Minecraft stores worlds, mods, etc.", dir_widget)
+
+        # Version toggles
         for key, title, desc in [
             ("show_snapshots", "Show Snapshots", "Include snapshot versions in version list."),
             ("show_beta", "Show Beta", "Include old beta versions."),
@@ -1075,252 +1256,316 @@ class OmniLauncherApp:
             ("check_updates", "Check for Launcher Updates", "Automatically check GitHub releases."),
         ]:
             default = True if key == "sort_versions_desc" else False
-            var = tk.BooleanVar(value=self.settings.get("general", key, default=default))
-            # create checkbutton with parent p, _settings_row will handle packing into right via in_=right
-            c = tk.Checkbutton(p, variable=var, bg=th["card_bg"], activebackground=th["card_bg"], selectcolor=th["input_bg"],
-                               command=lambda k=key, v=var: (self.settings.set(v.get(), "general", k), self.settings.save(), self._reload_versions() if k.startswith("show_") else None))
-            self._settings_row(p, title, desc, c)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("general", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "general", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        # keep launcher open
-        var_keep = tk.StringVar(value=self.settings.get("general", "keep_launcher_open", default="hide"))
-        combo_keep = ttk.Combobox(p, textvariable=var_keep, values=["hide", "close", "keep_open", "minimize"], state="readonly", width=18)
-        combo_keep.bind("<<ComboboxSelected>>", lambda e: (self.settings.set(var_keep.get(), "general", "keep_launcher_open"), self.settings.save()))
-        self._settings_row(p, "Launcher Visibility After Game Start", "What to do with launcher when Minecraft launches.", combo_keep)
+        # Keep launcher open
+        keep_combo = QComboBox()
+        keep_combo.addItems(["hide", "close", "keep_open", "minimize"])
+        keep_combo.setCurrentText(self.settings.get("general", "keep_launcher_open", default="hide"))
+        keep_combo.currentTextChanged.connect(lambda v: (self.settings.set(v, "general", "keep_launcher_open"), self.settings.save()))
+        self._add_settings_row(layout, "Launcher Visibility After Game Start", "What to do with launcher when Minecraft launches.", keep_combo)
 
-        # concurrent downloads
-        var_conc = tk.IntVar(value=self.settings.get("general", "concurrent_downloads", default=4))
-        scale = tk.Scale(p, from_=1, to=8, orient="horizontal", variable=var_conc, bg=th["card_bg"], fg=th["text_secondary"], troughcolor=th["progress_bg"], highlightthickness=0, command=lambda v: (self.settings.set(int(float(v)), "general", "concurrent_downloads"), self.settings.save()))
-        self._settings_row(p, "Concurrent Downloads", "How many files to download in parallel.", scale)
+        # Concurrent downloads
+        conc_spin = QSpinBox()
+        conc_spin.setRange(1, 8)
+        conc_spin.setValue(self.settings.get("general", "concurrent_downloads", default=4))
+        conc_spin.valueChanged.connect(lambda v: (self.settings.set(v, "general", "concurrent_downloads"), self.settings.save()))
+        self._add_settings_row(layout, "Concurrent Downloads", "How many files to download in parallel.", conc_spin)
 
-        # minimize to tray
-        var_tray = tk.BooleanVar(value=self.settings.get("general", "minimize_to_tray", default=False))
-        chk_tray = tk.Checkbutton(p, variable=var_tray, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_tray.get(), "general", "minimize_to_tray"), self.settings.save()))
-        self._settings_row(p, "Minimize to Tray", "Minimize launcher to system tray while playing.", chk_tray)
+        # Minimize to tray
+        tray_chk = QCheckBox()
+        tray_chk.setChecked(self.settings.get("general", "minimize_to_tray", default=False))
+        tray_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "general", "minimize_to_tray"), self.settings.save()))
+        self._add_settings_row(layout, "Minimize to Tray", "Minimize launcher to system tray while playing.", tray_chk)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_java(self):
-        th = self.theme
-        p = self.settings_subpages["java"]
-        self._settings_section_title(p, "Java", "Java runtime configuration with per-instance overrides and globally.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        var_auto = tk.BooleanVar(value=self.settings.get("java", "auto_detect", default=True))
-        chk_auto = tk.Checkbutton(p, variable=var_auto, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_auto.get(), "java", "auto_detect"), self.settings.save(), self._refresh_java_list()))
-        self._settings_row(p, "Auto-detect Java", "Automatically find installed Java versions.", chk_auto)
+        self._add_settings_section(layout, "Java", "Java runtime configuration with per-instance overrides and globally.")
 
-        # java path
-        frame_java = tk.Frame(p, bg=th["card_bg"])
-        self.java_path_var = tk.StringVar(value=self.settings.get("java", "java_path", default=""))
-        ent_java = tk.Entry(frame_java, textvariable=self.java_path_var, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=36)
-        btn_java_browse = tk.Button(frame_java, text="Browse", bg=th["input_bg"], fg=th["text_secondary"], bd=0, font=("Segoe UI", 8), command=lambda: self._browse_file(self.java_path_var))
-        ent_java.pack(side="left", padx=4)
-        btn_java_browse.pack(side="left", padx=4)
-        self._settings_row(p, "Java Executable Path", "Custom java.exe / java binary. Leave empty for auto.", frame_java)
-        self.java_path_var.trace_add("write", lambda *a: (self.settings.set(self.java_path_var.get(), "java", "java_path"), self.settings.save()))
+        auto_chk = QCheckBox()
+        auto_chk.setChecked(self.settings.get("java", "auto_detect", default=True))
+        auto_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "java", "auto_detect"), self.settings.save(), self._refresh_java_list()))
+        self._add_settings_row(layout, "Auto-detect Java", "Automatically find installed Java versions.", auto_chk)
 
-        # detected list
-        detected_frame = tk.Frame(p, bg=th["card_bg"])
-        detected_label = tk.Label(detected_frame, text="Detected Javas: searching...", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"])
-        detected_label.pack(anchor="w")
-        self.java_detected_listbox = tk.Listbox(detected_frame, height=5, bg=th["input_bg"], fg=th["text_secondary"], bd=0, font=("Segoe UI", 8))
-        self.java_detected_listbox.pack(fill="x", pady=4)
-        tk.Button(detected_frame, text="Refresh Detection", font=("Segoe UI", 8), bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=self._refresh_java_list).pack(anchor="w", pady=2)
-        self._settings_row(p, "Java Installations", "List of automatically found Java runtimes.", detected_frame)
+        # Java path
+        java_widget = QWidget()
+        java_layout = QHBoxLayout(java_widget)
+        java_layout.setContentsMargins(0, 0, 0, 0)
+        self.java_path_edit = QLineEdit(self.settings.get("java", "java_path", default=""))
+        self.java_path_edit.setFixedWidth(300)
+        self.java_path_edit.textChanged.connect(lambda v: (self.settings.set(v, "java", "java_path"), self.settings.save()))
+        java_layout.addWidget(self.java_path_edit)
+        browse_btn = QPushButton("Browse")
+        browse_btn.clicked.connect(self._browse_java)
+        java_layout.addWidget(browse_btn)
+        self._add_settings_row(layout, "Java Executable Path", "Custom java binary. Leave empty for auto.", java_widget)
+
+        # Detected list
+        self.java_list_widget = QListWidget()
+        self.java_list_widget.setMaximumHeight(130)
+        self._add_settings_row(layout, "Java Installations", "Auto-detected Java runtimes.", self.java_list_widget)
+
+        refresh_java_btn = QPushButton("Refresh Detection")
+        refresh_java_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh_java_btn.clicked.connect(self._refresh_java_list)
+        layout.addWidget(refresh_java_btn)
 
         # RAM
-        self.ram_min_var = tk.IntVar(value=self.settings.get("java", "min_ram_mb", default=512))
-        self.ram_max_var = tk.IntVar(value=self.settings.get("java", "max_ram_mb", default=4096))
-        ram_frame = tk.Frame(p, bg=th["card_bg"])
-        tk.Label(ram_frame, text="Min", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Scale(ram_frame, from_=256, to=4096, orient="horizontal", variable=self.ram_min_var, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, length=140, command=lambda v: (self.settings.set(int(float(v)), "java", "min_ram_mb"), self.settings.save())).pack(side="left", padx=4)
-        tk.Label(ram_frame, text="Max", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Scale(ram_frame, from_=1024, to=16384, orient="horizontal", variable=self.ram_max_var, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, length=140, resolution=256, command=lambda v: (self.settings.set(int(float(v)), "java", "max_ram_mb"), self.settings.save(), self.ram_var.set(int(float(v))))).pack(side="left", padx=4)
-        self._settings_row(p, "RAM Allocation (MB)", "Minimum and maximum memory for Minecraft JVM.", ram_frame)
+        ram_widget = QWidget()
+        ram_layout = QHBoxLayout(ram_widget)
+        ram_layout.setContentsMargins(0, 0, 0, 0)
+        ram_layout.addWidget(QLabel("Min"))
+        min_ram = QSpinBox()
+        min_ram.setRange(256, 4096)
+        min_ram.setValue(self.settings.get("java", "min_ram_mb", default=512))
+        min_ram.valueChanged.connect(lambda v: (self.settings.set(v, "java", "min_ram_mb"), self.settings.save()))
+        ram_layout.addWidget(min_ram)
+        ram_layout.addWidget(QLabel("Max"))
+        max_ram = QSpinBox()
+        max_ram.setRange(1024, 16384)
+        max_ram.setValue(self.settings.get("java", "max_ram_mb", default=4096))
+        max_ram.setSingleStep(256)
+        max_ram.valueChanged.connect(lambda v: (self.settings.set(v, "java", "max_ram_mb"), self.settings.save()))
+        ram_layout.addWidget(max_ram)
+        self._add_settings_row(layout, "RAM Allocation (MB)", "Min/max memory for Minecraft JVM.", ram_widget)
 
         # JVM args
-        var_use_jvm = tk.BooleanVar(value=self.settings.get("java", "use_custom_args", default=False))
-        chk_use_jvm = tk.Checkbutton(p, variable=var_use_jvm, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_use_jvm.get(), "java", "use_custom_args"), self.settings.save()))
-        self._settings_row(p, "Use Custom JVM Arguments", "Enable custom JVM args.", chk_use_jvm)
+        jvm_chk = QCheckBox()
+        jvm_chk.setChecked(self.settings.get("java", "use_custom_args", default=False))
+        jvm_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "java", "use_custom_args"), self.settings.save()))
+        self._add_settings_row(layout, "Use Custom JVM Arguments", "Enable custom JVM args.", jvm_chk)
 
-        var_jvm_args = tk.StringVar(value=self.settings.get("java", "jvm_args", default=""))
-        ent_jvm = tk.Entry(p, textvariable=var_jvm_args, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=48)
-        ent_jvm.bind("<FocusOut>", lambda e: (self.settings.set(var_jvm_args.get(), "java", "jvm_args"), self.settings.save()))
-        self._settings_row(p, "JVM Arguments", "Custom JVM args like -XX:+UseG1GC etc.", ent_jvm)
+        jvm_edit = QLineEdit(self.settings.get("java", "jvm_args", default=""))
+        jvm_edit.textChanged.connect(lambda v: (self.settings.set(v, "java", "jvm_args"), self.settings.save()))
+        self._add_settings_row(layout, "JVM Arguments", "Custom JVM args like -XX:+UseG1GC", jvm_edit)
 
-        # other toggles
-        for key, title, desc in [
-            ("enable_gc_logging", "Enable GC Logging", "Log garbage collector details."),
-        ]:
-            var = tk.BooleanVar(value=self.settings.get("java", key, default=False))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "java", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+        # GC logging
+        gc_chk = QCheckBox()
+        gc_chk.setChecked(self.settings.get("java", "enable_gc_logging", default=False))
+        gc_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "java", "enable_gc_logging"), self.settings.save()))
+        self._add_settings_row(layout, "Enable GC Logging", "Log garbage collector details.", gc_chk)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_game(self):
-        th = self.theme
-        p = self.settings_subpages["game"]
-        self._settings_section_title(p, "Game", "Resolution, fullscreen, demo, custom game args, quick play.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        var_res_enabled = tk.BooleanVar(value=self.settings.get("game", "resolution", "enabled", default=False))
-        chk_res = tk.Checkbutton(p, variable=var_res_enabled, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_res_enabled.get(), "game", "resolution", "enabled"), self.settings.save()))
-        self._settings_row(p, "Custom Resolution", "Enable custom window size.", chk_res)
+        self._add_settings_section(layout, "Game", "Resolution, fullscreen, demo, custom game args, quick play.")
 
-        frame_res = tk.Frame(p, bg=th["card_bg"])
-        var_w = tk.IntVar(value=self.settings.get("game", "resolution", "width", default=854))
-        var_h = tk.IntVar(value=self.settings.get("game", "resolution", "height", default=480))
-        var_full = tk.BooleanVar(value=self.settings.get("game", "resolution", "fullscreen", default=False))
-        tk.Label(frame_res, text="W", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Entry(frame_res, textvariable=var_w, width=6, bg=th["input_bg"], fg=th["text_primary"], bd=0).pack(side="left", padx=2)
-        tk.Label(frame_res, text="H", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left", padx=(6, 0))
-        tk.Entry(frame_res, textvariable=var_h, width=6, bg=th["input_bg"], fg=th["text_primary"], bd=0).pack(side="left", padx=2)
-        tk.Checkbutton(frame_res, text="Fullscreen", variable=var_full, bg=th["card_bg"], selectcolor=th["input_bg"]).pack(side="left", padx=8)
-        # tracers
-        def save_res(*a):
-            self.settings.set(var_w.get(), "game", "resolution", "width")
-            self.settings.set(var_h.get(), "game", "resolution", "height")
-            self.settings.set(var_full.get(), "game", "resolution", "fullscreen")
-            self.settings.save()
-        var_w.trace_add("write", save_res)
-        var_h.trace_add("write", save_res)
-        var_full.trace_add("write", save_res)
-        self._settings_row(p, "Resolution Values", "Width, Height, and fullscreen toggle.", frame_res)
+        res_chk = QCheckBox()
+        res_chk.setChecked(self.settings.get("game", "resolution", "enabled", default=False))
+        res_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "game", "resolution", "enabled"), self.settings.save()))
+        self._add_settings_row(layout, "Custom Resolution", "Enable custom window size.", res_chk)
 
-        var_use_game_args = tk.BooleanVar(value=self.settings.get("game", "use_custom_args", default=False))
-        chk_game_args_en = tk.Checkbutton(p, variable=var_use_game_args, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_use_game_args.get(), "game", "use_custom_args"), self.settings.save()))
-        self._settings_row(p, "Use Custom Game Arguments", "Enable extra args passed to Minecraft.", chk_game_args_en)
+        res_widget = QWidget()
+        res_layout = QHBoxLayout(res_widget)
+        res_layout.setContentsMargins(0, 0, 0, 0)
+        res_layout.addWidget(QLabel("W"))
+        w_spin = QSpinBox()
+        w_spin.setRange(640, 3840)
+        w_spin.setValue(self.settings.get("game", "resolution", "width", default=854))
+        w_spin.valueChanged.connect(lambda v: (self.settings.set(v, "game", "resolution", "width"), self.settings.save()))
+        res_layout.addWidget(w_spin)
+        res_layout.addWidget(QLabel("H"))
+        h_spin = QSpinBox()
+        h_spin.setRange(480, 2160)
+        h_spin.setValue(self.settings.get("game", "resolution", "height", default=480))
+        h_spin.valueChanged.connect(lambda v: (self.settings.set(v, "game", "resolution", "height"), self.settings.save()))
+        res_layout.addWidget(h_spin)
+        fs_chk = QCheckBox("Fullscreen")
+        fs_chk.setChecked(self.settings.get("game", "resolution", "fullscreen", default=False))
+        fs_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "game", "resolution", "fullscreen"), self.settings.save()))
+        res_layout.addWidget(fs_chk)
+        self._add_settings_row(layout, "Resolution Values", "Width, Height, fullscreen toggle.", res_widget)
 
-        var_game_args = tk.StringVar(value=self.settings.get("game", "game_args", default=""))
-        ent_game = tk.Entry(p, textvariable=var_game_args, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=48)
-        ent_game.bind("<FocusOut>", lambda e: (self.settings.set(var_game_args.get(), "game", "game_args"), self.settings.save()))
-        self._settings_row(p, "Game Arguments", "For example --server ip --port 25565 or custom mods args.", ent_game)
+        # Custom game args
+        game_args_chk = QCheckBox()
+        game_args_chk.setChecked(self.settings.get("game", "use_custom_args", default=False))
+        game_args_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "game", "use_custom_args"), self.settings.save()))
+        self._add_settings_row(layout, "Use Custom Game Arguments", "Enable extra args passed to Minecraft.", game_args_chk)
 
-        for key, title, desc in [
-            ("demo", "Demo Mode", "Launch game in demo mode."),
-            ("disable_multiplayer", "Disable Multiplayer", "Disable multiplayer button (for parental control)."),
-            ("enable_logging", "Enable Game Logging", "Keep game logs on disk."),
-            ("enable_chat_preview", "Enable Chat Preview", "Show chat preview."),
+        game_args_edit = QLineEdit(self.settings.get("game", "game_args", default=""))
+        game_args_edit.textChanged.connect(lambda v: (self.settings.set(v, "game", "game_args"), self.settings.save()))
+        self._add_settings_row(layout, "Game Arguments", "For example --server ip --port 25565.", game_args_edit)
+
+        # Toggles
+        for key, title, desc, default in [
+            ("demo", "Demo Mode", "Launch game in demo mode.", False),
+            ("disable_multiplayer", "Disable Multiplayer", "Disable multiplayer (parental control).", False),
+            ("enable_logging", "Enable Game Logging", "Keep game logs on disk.", True),
+            ("enable_chat_preview", "Enable Chat Preview", "Show chat preview.", True),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("game", key, default=False if key != "enable_logging" and key != "enable_chat_preview" else True))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "game", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("game", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "game", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        # auto connect
-        frame_ac = tk.Frame(p, bg=th["card_bg"])
-        var_ac_en = tk.BooleanVar(value=self.settings.get("game", "auto_connect", "enabled", default=False))
-        var_ac_srv = tk.StringVar(value=self.settings.get("game", "auto_connect", "server", default=""))
-        tk.Checkbutton(frame_ac, variable=var_ac_en, bg=th["card_bg"], selectcolor=th["input_bg"]).pack(side="left")
-        tk.Entry(frame_ac, textvariable=var_ac_srv, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=24).pack(side="left", padx=6)
-        def save_ac(*a):
-            self.settings.set(var_ac_en.get(), "game", "auto_connect", "enabled")
-            self.settings.set(var_ac_srv.get(), "game", "auto_connect", "server")
-            self.settings.save()
-        var_ac_en.trace_add("write", save_ac)
-        var_ac_srv.trace_add("write", save_ac)
-        self._settings_row(p, "Auto Connect Server", "Automatically connect to a server on launch.", frame_ac)
+        # Auto connect
+        ac_widget = QWidget()
+        ac_layout = QHBoxLayout(ac_widget)
+        ac_layout.setContentsMargins(0, 0, 0, 0)
+        ac_chk = QCheckBox()
+        ac_chk.setChecked(self.settings.get("game", "auto_connect", "enabled", default=False))
+        ac_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "game", "auto_connect", "enabled"), self.settings.save()))
+        ac_layout.addWidget(ac_chk)
+        ac_edit = QLineEdit(self.settings.get("game", "auto_connect", "server", default=""))
+        ac_edit.textChanged.connect(lambda v: (self.settings.set(v, "game", "auto_connect", "server"), self.settings.save()))
+        ac_layout.addWidget(ac_edit)
+        self._add_settings_row(layout, "Auto Connect Server", "Automatically connect to a server on launch.", ac_widget)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_appearance(self):
-        th = self.theme
-        p = self.settings_subpages["appearance"]
-        self._settings_section_title(p, "Appearance", "Themes, accent colors, animations, layouts with modern features.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        var_theme = tk.StringVar(value=self.settings.get("appearance", "theme", default="dark"))
-        combo_theme = ttk.Combobox(p, textvariable=var_theme, values=list(THEMES.keys()), state="readonly", width=18)
-        combo_theme.bind("<<ComboboxSelected>>", lambda e: self._change_theme(var_theme.get()))
-        self._settings_row(p, "Theme", "Dark, Midnight, Light, AMOLED. Requires restart for full effect but live partially.", combo_theme)
+        self._add_settings_section(layout, "Appearance", "Themes, accent colors, animations, layouts.")
 
-        # accent palette
-        accent_frame = tk.Frame(p, bg=th["card_bg"])
-        var_accent = tk.StringVar(value=self.settings.get("appearance", "accent_color", default=th["accent"]))
-        ent_accent = tk.Entry(accent_frame, textvariable=var_accent, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=12)
-        ent_accent.pack(side="left", padx=4)
-        ent_accent.bind("<FocusOut>", lambda e: (self.settings.set(var_accent.get(), "appearance", "accent_color"), self.settings.save()))
-        for col in ACCENT_PALETTE:
-            btn = tk.Button(accent_frame, bg=col, width=2, height=1, bd=0, command=lambda c=col: (var_accent.set(c), self.settings.set(c, "appearance", "accent_color"), self.settings.save()))
-            btn.pack(side="left", padx=2)
-        self._settings_row(p, "Accent Color", "Primary highlight color used for buttons and highlights.", accent_frame)
+        # Theme
+        theme_combo = QComboBox()
+        theme_combo.addItems(list(THEMES.keys()))
+        theme_combo.setCurrentText(self.theme_name)
+        theme_combo.currentTextChanged.connect(self._change_theme)
+        self._add_settings_row(layout, "Theme", "Dark, Midnight, Light, AMOLED.", theme_combo)
 
+        # Accent color
+        accent_widget = QWidget()
+        accent_layout = QHBoxLayout(accent_widget)
+        accent_layout.setContentsMargins(0, 0, 0, 0)
+        self.accent_edit = QLineEdit(self.settings.get("appearance", "accent_color", default=t["accent"]))
+        self.accent_edit.setFixedWidth(100)
+        self.accent_edit.textChanged.connect(lambda v: (self.settings.set(v, "appearance", "accent_color"), self.settings.save()))
+        accent_layout.addWidget(self.accent_edit)
+        for col in ACCENT_PALETTE[:10]:
+            btn = QPushButton()
+            btn.setFixedSize(24, 24)
+            btn.setStyleSheet(f"background-color: {col}; border: none; border-radius: 4px;")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, c=col: (self.accent_edit.setText(c), self.settings.set(c, "appearance", "accent_color"), self.settings.save()))
+            accent_layout.addWidget(btn)
+        accent_layout.addStretch()
+        self._add_settings_row(layout, "Accent Color", "Primary highlight color.", accent_widget)
+
+        # Background style / layout
         for key, values, title, desc in [
-            ("background_style", ["gradient", "solid", "image", "animated"], "Background Style", "Background rendering mode for login screen."),
-            ("layout", ["modern", "classic"], "Layout Style", "Modern (new 4.0) vs Classic (old)."),
+            ("background_style", ["gradient", "solid", "image", "animated"], "Background Style", "Background rendering mode."),
+            ("layout", ["modern", "classic"], "Layout Style", "Modern vs Classic."),
         ]:
-            var = tk.StringVar(value=self.settings.get("appearance", key, default=values[0]))
-            combo = ttk.Combobox(p, textvariable=var, values=values, state="readonly", width=14)
-            combo.bind("<<ComboboxSelected>>", lambda e, k=key, v=var: (self.settings.set(v.get(), "appearance", k), self.settings.save()))
-            self._settings_row(p, title, desc, combo)
+            combo = QComboBox()
+            combo.addItems(values)
+            combo.setCurrentText(self.settings.get("appearance", key, default=values[0]))
+            combo.currentTextChanged.connect(lambda v, k=key: (self.settings.set(v, "appearance", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, combo)
 
-        for key, title, desc in [
-            ("animations", "Enable Animations", "Transitions and animated background on login."),
-            ("compact_mode", "Compact Mode", "Less padding, more content like old launcher."),
-            ("sidebar_compact", "Compact Sidebar", "Icons only sidebar (72px) instead of full."),
-            ("show_instance_icons", "Show Instance Icons", "Display block icons for instances."),
+        # Toggle settings
+        for key, title, desc, default in [
+            ("animations", "Enable Animations", "Transitions and animations.", True),
+            ("compact_mode", "Compact Mode", "Less padding, more content.", False),
+            ("sidebar_compact", "Compact Sidebar", "Icons only sidebar.", False),
+            ("show_instance_icons", "Show Instance Icons", "Display block icons.", True),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("appearance", key, default=True if key == "animations" or key == "show_instance_icons" else False))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "appearance", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("appearance", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "appearance", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        # font scale
-        var_font = tk.DoubleVar(value=self.settings.get("appearance", "font_scale", default=1.0))
-        scale_font = tk.Scale(p, from_=0.8, to=1.4, resolution=0.1, orient="horizontal", variable=var_font, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, command=lambda v: (self.settings.set(float(v), "appearance", "font_scale"), self.settings.save()))
-        self._settings_row(p, "Font Scale", "Adjust overall font scaling.", scale_font)
+        # Font scale
+        font_slider = QDoubleSpinBox()
+        font_slider.setRange(0.8, 1.4)
+        font_slider.setSingleStep(0.1)
+        font_slider.setValue(self.settings.get("appearance", "font_scale", default=1.0))
+        font_slider.valueChanged.connect(lambda v: (self.settings.set(v, "appearance", "font_scale"), self.settings.save()))
+        self._add_settings_row(layout, "Font Scale", "Adjust overall font scaling.", font_slider)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_network(self):
-        th = self.theme
-        p = self.settings_subpages["network"]
-        self._settings_section_title(p, "Network", "Offline mode, proxy, timeouts, parallel downloads.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        for key, title, desc in [
-            ("offline_mode", "Offline Mode", "Force offline even if internet available."),
-            ("parallel_downloads", "Parallel Downloads", "Use parallel download engine."),
+        self._add_settings_section(layout, "Network", "Offline mode, proxy, timeouts, parallel downloads.")
+
+        for key, title, desc, default in [
+            ("offline_mode", "Offline Mode", "Force offline even if internet available.", False),
+            ("parallel_downloads", "Parallel Downloads", "Use parallel download engine.", True),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("network", key, default=False if key == "offline_mode" else True))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "network", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("network", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "network", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        var_proxy_en = tk.BooleanVar(value=self.settings.get("network", "proxy_enabled", default=False))
-        chk_proxy_en = tk.Checkbutton(p, variable=var_proxy_en, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_proxy_en.get(), "network", "proxy_enabled"), self.settings.save()))
-        self._settings_row(p, "Enable Proxy", "Route launcher traffic through proxy.", chk_proxy_en)
+        # Proxy
+        proxy_chk = QCheckBox()
+        proxy_chk.setChecked(self.settings.get("network", "proxy_enabled", default=False))
+        proxy_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "network", "proxy_enabled"), self.settings.save()))
+        self._add_settings_row(layout, "Enable Proxy", "Route traffic through proxy.", proxy_chk)
 
-        var_proxy_type = tk.StringVar(value=self.settings.get("network", "proxy_type", default="http"))
-        combo_pt = ttk.Combobox(p, textvariable=var_proxy_type, values=["http", "socks5", "system"], state="readonly", width=12)
-        combo_pt.bind("<<ComboboxSelected>>", lambda e: (self.settings.set(var_proxy_type.get(), "network", "proxy_type"), self.settings.save()))
-        self._settings_row(p, "Proxy Type", "HTTP, SOCKS5, or System.", combo_pt)
+        proxy_type = QComboBox()
+        proxy_type.addItems(["http", "socks5", "system"])
+        proxy_type.setCurrentText(self.settings.get("network", "proxy_type", default="http"))
+        proxy_type.currentTextChanged.connect(lambda v: (self.settings.set(v, "network", "proxy_type"), self.settings.save()))
+        self._add_settings_row(layout, "Proxy Type", "HTTP, SOCKS5, or System.", proxy_type)
 
-        # host/port/user/pass
-        frame_proxy = tk.Frame(p, bg=th["card_bg"])
-        var_host = tk.StringVar(value=self.settings.get("network", "proxy_host", default=""))
-        var_port = tk.IntVar(value=self.settings.get("network", "proxy_port", default=8080))
-        tk.Label(frame_proxy, text="Host", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Entry(frame_proxy, textvariable=var_host, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=18).pack(side="left", padx=4)
-        tk.Label(frame_proxy, text="Port", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Entry(frame_proxy, textvariable=var_port, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=6).pack(side="left", padx=4)
-        def save_proxy(*a):
-            self.settings.set(var_host.get(), "network", "proxy_host")
-            self.settings.set(var_port.get(), "network", "proxy_port")
-            self.settings.save()
-        var_host.trace_add("write", save_proxy)
-        var_port.trace_add("write", save_proxy)
-        self._settings_row(p, "Proxy Host/Port", "Proxy server address.", frame_proxy)
+        proxy_widget = QWidget()
+        proxy_layout = QHBoxLayout(proxy_widget)
+        proxy_layout.setContentsMargins(0, 0, 0, 0)
+        proxy_layout.addWidget(QLabel("Host"))
+        host_edit = QLineEdit(self.settings.get("network", "proxy_host", default=""))
+        host_edit.textChanged.connect(lambda v: (self.settings.set(v, "network", "proxy_host"), self.settings.save()))
+        proxy_layout.addWidget(host_edit)
+        proxy_layout.addWidget(QLabel("Port"))
+        port_spin = QSpinBox()
+        port_spin.setRange(1, 65535)
+        port_spin.setValue(self.settings.get("network", "proxy_port", default=8080))
+        port_spin.valueChanged.connect(lambda v: (self.settings.set(v, "network", "proxy_port"), self.settings.save()))
+        proxy_layout.addWidget(port_spin)
+        self._add_settings_row(layout, "Proxy Host/Port", "Proxy server address.", proxy_widget)
 
-        frame_auth = tk.Frame(p, bg=th["card_bg"])
-        var_user = tk.StringVar(value=self.settings.get("network", "proxy_user", default=""))
-        var_pass = tk.StringVar(value=self.settings.get("network", "proxy_pass", default=""))
-        tk.Label(frame_auth, text="User", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Entry(frame_auth, textvariable=var_user, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=14).pack(side="left", padx=4)
-        tk.Label(frame_auth, text="Pass", bg=th["card_bg"], fg=th["text_muted"], font=("Segoe UI", 8)).pack(side="left")
-        tk.Entry(frame_auth, textvariable=var_pass, show="*", bg=th["input_bg"], fg=th["text_primary"], bd=0, width=14).pack(side="left", padx=4)
-        def save_auth(*a):
-            self.settings.set(var_user.get(), "network", "proxy_user")
-            self.settings.set(var_pass.get(), "network", "proxy_pass")
-            self.settings.save()
-        var_user.trace_add("write", save_auth)
-        var_pass.trace_add("write", save_auth)
-        self._settings_row(p, "Proxy Authentication", "Optional proxy credentials.", frame_auth)
+        auth_widget = QWidget()
+        auth_layout = QHBoxLayout(auth_widget)
+        auth_layout.setContentsMargins(0, 0, 0, 0)
+        auth_layout.addWidget(QLabel("User"))
+        user_edit = QLineEdit(self.settings.get("network", "proxy_user", default=""))
+        user_edit.textChanged.connect(lambda v: (self.settings.set(v, "network", "proxy_user"), self.settings.save()))
+        auth_layout.addWidget(user_edit)
+        auth_layout.addWidget(QLabel("Pass"))
+        pass_edit = QLineEdit(self.settings.get("network", "proxy_pass", default=""))
+        pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        pass_edit.textChanged.connect(lambda v: (self.settings.set(v, "network", "proxy_pass"), self.settings.save()))
+        auth_layout.addWidget(pass_edit)
+        self._add_settings_row(layout, "Proxy Authentication", "Optional proxy credentials.", auth_widget)
 
-        var_timeout = tk.IntVar(value=self.settings.get("network", "timeout", default=30))
-        scale_to = tk.Scale(p, from_=5, to=120, orient="horizontal", variable=var_timeout, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, command=lambda v: (self.settings.set(int(float(v)), "network", "timeout"), self.settings.save()))
-        self._settings_row(p, "Network Timeout (s)", "Timeout for downloads.", scale_to)
+        timeout_spin = QSpinBox()
+        timeout_spin.setRange(5, 120)
+        timeout_spin.setValue(self.settings.get("network", "timeout", default=30))
+        timeout_spin.valueChanged.connect(lambda v: (self.settings.set(v, "network", "timeout"), self.settings.save()))
+        self._add_settings_row(layout, "Network Timeout (s)", "Timeout for downloads.", timeout_spin)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_launcher(self):
-        th = self.theme
-        p = self.settings_subpages["launcher"]
-        self._settings_section_title(p, "Launcher & Console", "Console visibility, font, filters, logging, debug, file watcher.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
+
+        self._add_settings_section(layout, "Launcher & Console", "Console visibility, font, filters, logging, debug.")
 
         for key, title, desc, default in [
             ("console_visible", "Console Visible", "Show console tab and live logs.", True),
@@ -1332,222 +1577,387 @@ class OmniLauncherApp:
             ("enable_file_watcher", "Enable File Watcher", "Watch instance files for external changes.", True),
             ("close_after_crash_report", "Close After Crash Report", "Close launcher after showing crash report.", False),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("launcher", key, default=default))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "launcher", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("launcher", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "launcher", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        var_font_size = tk.IntVar(value=self.settings.get("launcher", "console_font_size", default=10))
-        scale_font = tk.Scale(p, from_=8, to=18, orient="horizontal", variable=var_font_size, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, command=lambda v: (self.settings.set(int(float(v)), "launcher", "console_font_size"), self.settings.save()))
-        self._settings_row(p, "Console Font Size", "Adjust console text size.", scale_font)
+        font_spin = QSpinBox()
+        font_spin.setRange(8, 18)
+        font_spin.setValue(self.settings.get("launcher", "console_font_size", default=10))
+        font_spin.valueChanged.connect(lambda v: (self.settings.set(v, "launcher", "console_font_size"), self.settings.save()))
+        self._add_settings_row(layout, "Console Font Size", "Adjust console text size.", font_spin)
 
-        var_filter = tk.StringVar(value=self.settings.get("launcher", "console_filter_level", default="all"))
-        combo_filter = ttk.Combobox(p, textvariable=var_filter, values=["all", "info", "warn", "error"], state="readonly", width=12)
-        combo_filter.bind("<<ComboboxSelected>>", lambda e: (self.settings.set(var_filter.get(), "launcher", "console_filter_level"), self.settings.save()))
-        self._settings_row(p, "Console Filter Level", "Default log level filter.", combo_filter)
+        filter_combo = QComboBox()
+        filter_combo.addItems(["all", "info", "warn", "error"])
+        filter_combo.setCurrentText(self.settings.get("launcher", "console_filter_level", default="all"))
+        filter_combo.currentTextChanged.connect(lambda v: (self.settings.set(v, "launcher", "console_filter_level"), self.settings.save()))
+        self._add_settings_row(layout, "Console Filter Level", "Default log level filter.", filter_combo)
 
-        var_log_days = tk.IntVar(value=self.settings.get("launcher", "max_log_days", default=7))
-        scale_days = tk.Scale(p, from_=1, to=30, orient="horizontal", variable=var_log_days, bg=th["card_bg"], troughcolor=th["progress_bg"], highlightthickness=0, command=lambda v: (self.settings.set(int(float(v)), "launcher", "max_log_days"), self.settings.save()))
-        self._settings_row(p, "Max Log Days", "Days to keep log files.", scale_days)
+        days_spin = QSpinBox()
+        days_spin.setRange(1, 30)
+        days_spin.setValue(self.settings.get("launcher", "max_log_days", default=7))
+        days_spin.valueChanged.connect(lambda v: (self.settings.set(v, "launcher", "max_log_days"), self.settings.save()))
+        self._add_settings_row(layout, "Max Log Days", "Days to keep log files.", days_spin)
+
+        layout.addStretch()
+        self.settings_stack.addWidget(page)
 
     def _build_settings_advanced(self):
-        th = self.theme
-        p = self.settings_subpages["advanced"]
-        self._settings_section_title(p, "Advanced", "Power user options: env vars, pre/post commands, crash analyzer, malware scanner.")
+        t = self.theme
+        page = self._make_settings_page()
+        layout = page.layout()
 
-        var_enable_adv = tk.BooleanVar(value=self.settings.get("advanced", "enable_advanced_settings", default=False))
-        chk_enable = tk.Checkbutton(p, variable=var_enable_adv, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda: (self.settings.set(var_enable_adv.get(), "advanced", "enable_advanced_settings"), self.settings.save()))
-        self._settings_row(p, "Enable Advanced Settings", "Unlock advanced fields below.", chk_enable)
+        self._add_settings_section(layout, "Advanced", "Power user options: env vars, pre/post commands, crash analyzer.")
 
-        # text entries for commands
+        adv_chk = QCheckBox()
+        adv_chk.setChecked(self.settings.get("advanced", "enable_advanced_settings", default=False))
+        adv_chk.stateChanged.connect(lambda state: (self.settings.set(bool(state), "advanced", "enable_advanced_settings"), self.settings.save()))
+        self._add_settings_row(layout, "Enable Advanced Settings", "Unlock advanced fields below.", adv_chk)
+
         for key, title, desc in [
-            ("custom_env_vars", "Custom Environment Variables", "KEY=VALUE pairs separated by ; e.g. FOO=bar;BAZ=qux"),
-            ("pre_launch_command", "Pre-launch Command", "Command to run before game starts (e.g. script)."),
+            ("custom_env_vars", "Custom Environment Variables", "KEY=VALUE pairs separated by ;"),
+            ("pre_launch_command", "Pre-launch Command", "Command to run before game starts."),
             ("post_exit_command", "Post-exit Command", "Command after game exits."),
-            ("wrapper_command", "Wrapper Command", "Prefix game command (e.g. gamemoderun, prime-run)."),
+            ("wrapper_command", "Wrapper Command", "Prefix game command (e.g. gamemoderun)."),
         ]:
-            var = tk.StringVar(value=self.settings.get("advanced", key, default=""))
-            ent = tk.Entry(p, textvariable=var, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=48)
-            ent.bind("<FocusOut>", lambda e, k=key, v=var: (self.settings.set(v.get(), "advanced", k), self.settings.save()))
-            self._settings_row(p, title, desc, ent)
+            edit = QLineEdit(self.settings.get("advanced", key, default=""))
+            edit.textChanged.connect(lambda v, k=key: (self.settings.set(v, "advanced", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, edit)
 
         for key, title, desc, default in [
             ("enable_process_monitor", "Enable Process Monitor", "Monitor game process for crashes.", True),
-            ("kill_on_crash", "Kill on Crash", "Force kill if not responding after crash.", False),
+            ("kill_on_crash", "Kill on Crash", "Force kill if not responding.", False),
             ("enable_crash_analyzer", "Enable Crash Analyzer", "Analyze crash logs and suggest fixes.", True),
-            ("scan_mods_for_malware", "Scan Mods for Malware", "Built-in Fractureiser detection (with modern features).", True),
+            ("scan_mods_for_malware", "Scan Mods for Malware", "Built-in Fractureiser detection.", True),
             ("ignore_java_check", "Ignore Java Check", "Skip Java version validation.", False),
         ]:
-            var = tk.BooleanVar(value=self.settings.get("advanced", key, default=default))
-            chk = tk.Checkbutton(p, variable=var, bg=th["card_bg"], selectcolor=th["input_bg"], command=lambda k=key, v=var: (self.settings.set(v.get(), "advanced", k), self.settings.save()))
-            self._settings_row(p, title, desc, chk)
+            chk = QCheckBox()
+            chk.setChecked(self.settings.get("advanced", key, default=default))
+            chk.stateChanged.connect(lambda state, k=key: (self.settings.set(bool(state), "advanced", k), self.settings.save()))
+            self._add_settings_row(layout, title, desc, chk)
 
-        # actions
-        actions = tk.Frame(p, bg=th["card_bg"])
-        actions.pack(fill="x", padx=24, pady=16)
+        # Actions
+        actions = QHBoxLayout()
+        open_btn = QPushButton("Open Settings File")
+        open_btn.clicked.connect(lambda: open_folder(str(Path(self.settings.path).parent)))
+        actions.addWidget(open_btn)
 
-        tk.Button(actions, text="Open Settings File", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=lambda: open_folder(str(Path(self.settings.path).parent))).pack(side="left", padx=4)
-        tk.Button(actions, text="Export Settings", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=self._export_settings).pack(side="left", padx=4)
-        tk.Button(actions, text="Reset to Defaults", bg=th["error"], fg="white", bd=0, command=self._reset_settings).pack(side="left", padx=12)
-        tk.Button(actions, text="Delete ALL Data", bg="#ff0000", fg="white", bd=0, font=("Segoe UI", 9, "bold"), command=self._delete_all_data).pack(side="right", padx=4)
+        export_btn = QPushButton("Export Settings")
+        export_btn.clicked.connect(self._export_settings)
+        actions.addWidget(export_btn)
 
-    # CONSOLE
+        reset_btn = QPushButton("Reset to Defaults")
+        reset_btn.setStyleSheet(f"QPushButton {{ background-color: {t['error']}; color: white; border: none; border-radius: 6px; padding: 8px 16px; }}")
+        reset_btn.clicked.connect(self._reset_settings)
+        actions.addWidget(reset_btn)
+
+        delete_btn = QPushButton("Delete ALL Data")
+        delete_btn.setStyleSheet("QPushButton { background-color: #ff0000; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-weight: bold; }")
+        delete_btn.clicked.connect(self._delete_all_data)
+        actions.addWidget(delete_btn)
+
+        actions.addStretch()
+        layout.addLayout(actions)
+        layout.addStretch()
+
+        self.settings_stack.addWidget(page)
+
+    def _show_settings_subpage(self, key: str):
+        t = self.theme
+        # Highlight active nav
+        for k, btn in self.settings_nav_buttons.items():
+            if k == key:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {t['sidebar_active']};
+                        color: {t['text_primary']};
+                        border: none;
+                        border-radius: 8px;
+                        text-align: left;
+                        padding: 10px 16px;
+                        font-weight: bold;
+                        border-left: 3px solid {t['accent']};
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: transparent;
+                        color: {t['text_secondary']};
+                        border: none;
+                        border-radius: 8px;
+                        text-align: left;
+                        padding: 10px 16px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {t['sidebar_hover']};
+                        color: {t['text_primary']};
+                    }}
+                """)
+
+        idx_map = {"general": 0, "java": 1, "game": 2, "appearance": 3,
+                    "network": 4, "launcher": 5, "advanced": 6}
+        if key in idx_map:
+            self.settings_stack.setCurrentIndex(idx_map[key])
+
+    # CONSOLE PAGE
     def _build_console_page(self):
-        th = self.theme
-        page = self._make_page("console")
+        t = self.theme
+        outer = self._make_page()
+        layout = QVBoxLayout(outer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        toolbar = tk.Frame(page, bg=th["header_bg"], height=52)
-        toolbar.pack(fill="x")
-        toolbar.pack_propagate(False)
+        # Toolbar
+        toolbar = QFrame()
+        toolbar.setFixedHeight(52)
+        toolbar.setObjectName("header")
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(16, 0, 16, 0)
 
-        tk.Label(toolbar, text="Console", font=("Segoe UI", 11, "bold"), bg=th["header_bg"], fg=th["text_primary"]).pack(side="left", padx=16)
+        tb_layout.addWidget(make_section_label("Console", t, 11))
 
-        self.console_search_var = tk.StringVar()
-        tk.Entry(toolbar, textvariable=self.console_search_var, bg=th["input_bg"], fg=th["text_primary"], bd=0, width=20).pack(side="left", padx=8)
-        tk.Button(toolbar, text="Search", bg=th["card_bg"], fg=th["text_secondary"], bd=0, font=("Segoe UI", 8), command=self._console_search).pack(side="left")
+        self.console_search_edit = QLineEdit()
+        self.console_search_edit.setPlaceholderText("Search...")
+        self.console_search_edit.setFixedWidth(160)
+        tb_layout.addWidget(self.console_search_edit)
 
-        self.console_filter_var = tk.StringVar(value=self.settings.get("launcher", "console_filter_level", default="all"))
-        ttk.Combobox(toolbar, textvariable=self.console_filter_var, values=["all", "info", "warn", "error"], width=8, state="readonly").pack(side="left", padx=8)
+        search_btn = QPushButton("Search")
+        search_btn.clicked.connect(self._console_search)
+        tb_layout.addWidget(search_btn)
 
-        self.console_autoscroll_var = tk.BooleanVar(value=self.settings.get("launcher", "console_auto_scroll", default=True))
-        tk.Checkbutton(toolbar, text="Auto-scroll", variable=self.console_autoscroll_var, bg=th["header_bg"], fg=th["text_secondary"], selectcolor=th["input_bg"], activebackground=th["header_bg"]).pack(side="left", padx=8)
+        self.console_filter_combo = QComboBox()
+        self.console_filter_combo.addItems(["all", "info", "warn", "error"])
+        self.console_filter_combo.setCurrentText(self.settings.get("launcher", "console_filter_level", default="all"))
+        tb_layout.addWidget(self.console_filter_combo)
 
-        tk.Button(toolbar, text="💥 Analyze Crash", bg="#ff3b30", fg="white", bd=0, font=("Segoe UI", 8, "bold"), command=self._analyze_crash).pack(side="right", padx=8)
-        tk.Button(toolbar, text="📁 Explorer", bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._open_file_explorer).pack(side="right", padx=4)
-        tk.Button(toolbar, text="Clear", bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._clear_console).pack(side="right", padx=4)
-        tk.Button(toolbar, text="Export", bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._export_console).pack(side="right", padx=4)
-        tk.Button(toolbar, text="Copy", bg=th["card_bg"], fg=th["text_secondary"], bd=0, command=self._copy_console).pack(side="right", padx=4)
+        self.console_autoscroll_chk = QCheckBox("Auto-scroll")
+        self.console_autoscroll_chk.setChecked(self.settings.get("launcher", "console_auto_scroll", default=True))
+        tb_layout.addWidget(self.console_autoscroll_chk)
 
-        # text area
-        self.console_text = tk.Text(
-            page,
-            bg="black",
-            fg="#e0e0e0",
-            font=("Consolas", self.settings.get("launcher", "console_font_size", default=10)),
-            wrap="word" if self.settings.get("launcher", "console_word_wrap") else "none",
-            bd=0,
-            insertbackground="white",
-        )
-        self.console_text.pack(fill="both", expand=True, padx=16, pady=8)
-        self.console_text.tag_configure("error", foreground="#ff6b6b")
-        self.console_text.tag_configure("warn", foreground="#fbbf24")
-        self.console_text.tag_configure("info", foreground="#e6e8f0")
-        self.console_text.tag_configure("timestamp", foreground="#5c5f77")
-        self.console_text.configure(state="disabled")
+        tb_layout.addStretch()
 
-        self.console_lines_buffer: List[str] = []
+        crash_btn = QPushButton("💥 Analyze Crash")
+        crash_btn.setStyleSheet(f"QPushButton {{ background-color: #ff3b30; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-weight: bold; font-size: 11px; }}")
+        crash_btn.clicked.connect(self._analyze_crash)
+        tb_layout.addWidget(crash_btn)
 
-    # ABOUT
+        for text, slot in [("📁 Explorer", self._open_file_explorer), ("Clear", self._clear_console),
+                           ("Export", self._export_console), ("Copy", self._copy_console)]:
+            btn = QPushButton(text)
+            btn.clicked.connect(slot)
+            tb_layout.addWidget(btn)
+
+        layout.addWidget(toolbar)
+
+        # Console text
+        self.console_text = QPlainTextEdit()
+        self.console_text.setReadOnly(True)
+        self.console_text.setFont(QFont("Consolas", self.settings.get("launcher", "console_font_size", default=10)))
+        self.console_text.setStyleSheet(f"""
+            QPlainTextEdit {{
+                background-color: #000000;
+                color: #e0e0e0;
+                border: none;
+                padding: 8px;
+            }}
+        """)
+        layout.addWidget(self.console_text, 1)
+
+        self.console_page = outer
+        self.pages_stack.addWidget(outer)
+
+    # ABOUT PAGE
     def _build_about_page(self):
-        th = self.theme
-        page = self._make_page("about")
+        t = self.theme
+        page, inner = self._make_page_scroll()
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        header = tk.Frame(page, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        header.pack(fill="x", padx=16, pady=16)
+        # Header card
+        header = make_card_frame(t)
+        hdr_layout = QHBoxLayout(header)
+        hdr_layout.setContentsMargins(24, 16, 16, 16)
 
-        # logo big
-        canvas = tk.Canvas(header, width=80, height=80, bg=th["card_bg"], highlightthickness=0)
-        canvas.pack(side="left", padx=24, pady=16)
-        canvas.create_oval(8, 8, 72, 72, fill=th["bg_secondary"], outline=th["accent"], width=3)
-        canvas.create_text(40, 44, text="O", font=("Segoe UI", 28, "bold"), fill=th["accent"])
+        logo = QLabel("O")
+        logo.setFixedSize(72, 72)
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setStyleSheet(f"""
+            QLabel {{
+                background-color: {t['bg_secondary']};
+                color: {t['accent']};
+                border: 3px solid {t['accent']};
+                border-radius: 36px;
+                font-size: 32px;
+                font-weight: bold;
+            }}
+        """)
+        hdr_layout.addWidget(logo)
 
-        txt = tk.Frame(header, bg=th["card_bg"])
-        txt.pack(side="left", fill="y", pady=16)
-        tk.Label(txt, text="OmniLauncher-MC", font=("Segoe UI", 18, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w")
-        tk.Label(txt, text="v0.2.0", font=("Segoe UI", 10), bg=th["card_bg"], fg=th["text_secondary"]).pack(anchor="w")
-        tk.Label(txt, text="A modern, safe, open-source Minecraft launcher", font=("Segoe UI", 9), bg=th["card_bg"], fg=th["text_muted"], wraplength=500).pack(anchor="w", pady=4)
+        txt = QVBoxLayout()
+        txt.addWidget(make_section_label("OmniLauncher-MC", t, 18))
+        v_label = QLabel(f"v{VERSION}")
+        v_label.setStyleSheet(f"color: {t['text_secondary']};")
+        txt.addWidget(v_label)
+        txt.addWidget(make_desc_label("A modern, safe, open-source Minecraft launcher", t))
+        hdr_layout.addLayout(txt, 1)
 
-        btn_frame = tk.Frame(header, bg=th["card_bg"])
-        btn_frame.pack(side="right", padx=16)
-        tk.Button(btn_frame, text="GitHub", bg=th["input_bg"], fg=th["text_primary"], bd=0, command=lambda: webbrowser.open("https://github.com/OmniNodeCo/OmniLauncher-MC")).pack(pady=2, fill="x")
-        tk.Button(btn_frame, text="Website", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=lambda: webbrowser.open("https://github.com/OmniNodeCo/OmniLauncher-MC")).pack(pady=2, fill="x")
+        btn_frame = QVBoxLayout()
+        gh_btn = QPushButton("GitHub")
+        gh_btn.clicked.connect(lambda: webbrowser.open("https://github.com/OmniNodeCo/OmniLauncher-MC"))
+        btn_frame.addWidget(gh_btn)
+        web_btn = QPushButton("Website")
+        web_btn.clicked.connect(lambda: webbrowser.open("https://github.com/OmniNodeCo/OmniLauncher-MC"))
+        btn_frame.addWidget(web_btn)
+        hdr_layout.addLayout(btn_frame)
 
-        # info
-        info = tk.Frame(page, bg=th["bg"])
-        info.pack(fill="both", expand=True, padx=16, pady=8)
+        layout.addWidget(header)
 
-        left_info = tk.Frame(info, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        left_info.pack(side="left", fill="both", expand=True, padx=8)
+        # Info columns
+        cols = QHBoxLayout()
+        cols.setSpacing(16)
 
-        tk.Label(left_info, text="Changelog", font=("Segoe UI", 11, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=16, pady=(12, 4))
-        c_text = tk.Text(left_info, bg=th["input_bg"], fg=th["text_secondary"], font=("Segoe UI", 9), bd=0, wrap="word", height=18)
-        c_text.pack(fill="both", expand=True, padx=12, pady=8)
+        # Changelog
+        changelog = make_card_frame(t)
+        cl_layout = QVBoxLayout(changelog)
+        cl_layout.setContentsMargins(16, 12, 16, 12)
+        cl_layout.addWidget(make_section_label("Changelog", t, 11))
+
+        changelog_text = QPlainTextEdit()
+        changelog_text.setReadOnly(True)
+        changelog_text.setFont(QFont("Segoe UI", 9))
         try:
-            with open(Path(__file__).resolve().parents[3] / "Changelog.txt", "r") as f:
-                c_text.insert("1.0", f.read())
+            cl_path = Path(__file__).resolve().parents[3] / "Changelog.txt"
+            if cl_path.exists():
+                changelog_text.setPlainText(cl_path.read_text(encoding="utf-8"))
+            else:
+                changelog_text.setPlainText(f"v{VERSION}\n- PySide6 GUI remake\n- Modern dark theme\n- All features preserved")
         except Exception:
-            c_text.insert("1.0", "0.2.0\n- New dark UI with sidebar\n- Extensive settings\n- Instances, accounts, skins, mods placeholders\n- Console improvements\n- Java auto-detection")
-        c_text.configure(state="disabled")
+            changelog_text.setPlainText(f"v{VERSION}\n- PySide6 GUI remake")
+        changelog_text.setMaximumHeight(350)
+        cl_layout.addWidget(changelog_text)
+        cols.addWidget(changelog, 1)
 
-        right_info = tk.Frame(info, bg=th["bg"])
-        right_info.pack(side="left", fill="both", expand=True, padx=8)
+        # Right column
+        right_col = QVBoxLayout()
+        right_col.setSpacing(12)
 
-        lic = tk.Frame(right_info, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        lic.pack(fill="x", pady=8)
-        tk.Label(lic, text="License", font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(8, 2))
-        tk.Label(lic, text="MIT License • Open Source", font=("Segoe UI", 9), bg=th["card_bg"], fg=th["text_secondary"]).pack(anchor="w", padx=12, pady=(0, 8))
-        tk.Button(lic, text="View LICENSE.txt", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=lambda: self._open_text_file("License", "LICENSE.txt")).pack(anchor="w", padx=12, pady=4)
+        # License
+        lic = make_card_frame(t)
+        lic_layout = QVBoxLayout(lic)
+        lic_layout.setContentsMargins(12, 8, 12, 8)
+        lic_layout.addWidget(make_section_label("License", t, 10))
+        lic_layout.addWidget(make_desc_label("MIT License • Open Source", t))
+        lic_btn = QPushButton("View LICENSE.txt")
+        lic_btn.clicked.connect(lambda: self._open_text_file("License", "LICENSE.txt"))
+        lic_layout.addWidget(lic_btn)
+        right_col.addWidget(lic)
 
-        terms = tk.Frame(right_info, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        terms.pack(fill="x", pady=8)
-        tk.Label(terms, text="Terms & Credits", font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(8, 2))
-        tk.Label(terms, text="Not affiliated with Mojang or Microsoft.", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_muted"], wraplength=300, justify="left").pack(anchor="w", padx=12, pady=4)
-        tk.Button(terms, text="View TERMS.txt", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=lambda: self._open_text_file("Terms", "TERMS.txt")).pack(anchor="w", padx=12, pady=4)
-        tk.Button(terms, text="View TREE.md", bg=th["input_bg"], fg=th["text_secondary"], bd=0, command=lambda: self._open_text_file("Tree", "TREE.md")).pack(anchor="w", padx=12, pady=(4, 8))
+        # Terms
+        terms = make_card_frame(t)
+        terms_layout = QVBoxLayout(terms)
+        terms_layout.setContentsMargins(12, 8, 12, 8)
+        terms_layout.addWidget(make_section_label("Terms & Credits", t, 10))
+        terms_layout.addWidget(make_desc_label("Not affiliated with Mojang or Microsoft.", t))
+        for fname in ["TERMS.txt", "TREE.md"]:
+            btn = QPushButton(f"View {fname}")
+            btn.clicked.connect(lambda checked, f=fname: self._open_text_file(f.replace('.txt', '').replace('.md', ''), f))
+            terms_layout.addWidget(btn)
+        right_col.addWidget(terms)
 
-        sysinfo = tk.Frame(right_info, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-        sysinfo.pack(fill="x", pady=8)
-        tk.Label(sysinfo, text="System", font=("Segoe UI", 10, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(anchor="w", padx=12, pady=(8, 2))
-        tk.Label(sysinfo, text=f"OS: {platform.system()} {platform.release()} | Python: {platform.python_version()} | Dir: {self.settings.minecraft_dir}", font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"], wraplength=300, justify="left").pack(anchor="w", padx=12, pady=4)
+        # System
+        sysinfo = make_card_frame(t)
+        sys_layout = QVBoxLayout(sysinfo)
+        sys_layout.setContentsMargins(12, 8, 12, 8)
+        sys_layout.addWidget(make_section_label("System", t, 10))
+        sys_label = QLabel(
+            f"OS: {platform.system()} {platform.release()}\n"
+            f"Python: {platform.python_version()}\n"
+            f"Qt: 6.x (PySide6)\n"
+            f"Dir: {self.settings.minecraft_dir}"
+        )
+        sys_label.setFont(QFont("Segoe UI", 8))
+        sys_label.setStyleSheet(f"color: {t['text_secondary']};")
+        sys_layout.addWidget(sys_label)
+        right_col.addWidget(sysinfo)
+
+        right_col.addStretch()
+
+        right_widget = QWidget()
+        right_widget.setLayout(right_col)
+        cols.addWidget(right_widget)
+
+        layout.addLayout(cols)
+        layout.addStretch()
+
+        self.about_page = page
+        self.pages_stack.addWidget(page)
 
     # ------------------------------------------------------------------
-    # Logic
+    # Theme
+    # ------------------------------------------------------------------
+
+    def _apply_theme(self):
+        t = self.theme
+        qss = generate_stylesheet(t)
+        self.setStyleSheet(qss)
+
+        # Apply specific header/footer/sidebar backgrounds
+        self.header_frame.setStyleSheet(f"background-color: {t['header_bg']};")
+        self.footer_frame.setStyleSheet(f"background-color: {t['footer_bg']};")
+
+    def _change_theme(self, name: str):
+        self.settings.set(name, "appearance", "theme")
+        self.settings.save()
+        self.theme = get_theme(name)
+        self.theme_name = name
+        self._apply_theme()
+        QMessageBox.information(self, "Theme", f"Theme changed to {name}. Restart for full effect.")
+
+    # ------------------------------------------------------------------
+    # Page switching
     # ------------------------------------------------------------------
 
     def _show_page(self, key: str):
-        for k, frame in self.pages.items():
-            if k == key:
-                frame.pack(fill="both", expand=True)
-            else:
-                frame.pack_forget()
+        page_map = {
+            "play": 0, "instances": 1, "accounts": 2, "mods": 3,
+            "explorer": 4, "servers": 5, "friends": 6, "skins": 7,
+            "settings": 8, "console": 9, "about": 10,
+        }
+
         titles = {
             "play": ("Play", "Launch and manage your Minecraft worlds"),
             "instances": ("Instances", "Manage your profiles • Vanilla, Forge, Fabric, Quilt, NeoForge"),
-            "accounts": ("Accounts", "Offline & Microsoft accounts • Switch with one click • Offline mode works without internet"),
-            "mods": ("Mods & Addons", "Modrinth & CurseForge integration • Search and install with dependencies"),
-            "explorer": ("File Explorer", "Navigate, rename, delete, drag-drop files directly • Bookmarks for screenshots, worlds, logs"),
-            "servers": ("Server Browser", "Live server browser • Search, filter, sort, player counts, join directly [Experimental]"),
-            "friends": ("Friends List", "Experimental • Microsoft accounts only • See who is online, playing, invitations"),
-            "skins": ("Skins", "Steve / Alex models, capes, skin library"),
-            "settings": ("Settings", "Extensive configuration with modern design • General, Java, Game, Appearance, Network, Launcher, Advanced"),
-            "console": ("Console", "Real-time log • Search, filter, auto-scroll, pop-out, crash reporter, hide session ID"),
+            "accounts": ("Accounts", "Offline & Microsoft accounts • Switch with one click"),
+            "mods": ("Mods & Addons", "Modrinth & CurseForge integration"),
+            "explorer": ("File Explorer", "Navigate files • Bookmarks for screenshots, worlds, logs"),
+            "servers": ("Server Browser", "Search, filter, sort servers [Experimental]"),
+            "friends": ("Friends List", "Experimental • Microsoft accounts only"),
+            "skins": ("Skins", "Steve / Alex models, capes"),
+            "settings": ("Settings", "Extensive configuration • General, Java, Game, Appearance, Network, Launcher, Advanced"),
+            "console": ("Console", "Real-time log • Search, filter, crash reporter"),
             "about": ("About", "Version info, changelog, credits"),
         }
+
+        if key in page_map:
+            self.pages_stack.setCurrentIndex(page_map[key])
+
         if key in titles:
             t, sub = titles[key]
-            self.header_title.configure(text=t)
-            self.header_sub.configure(text=sub)
+            self.header_title.setText(t)
+            self.header_sub.setText(sub)
+
         self.current_page = key
-        # refresh data when entering
+
+        # Refresh data when entering
         if key == "instances":
             self._refresh_instances()
         elif key == "accounts":
             self._refresh_accounts()
         elif key == "play":
             self._refresh_play_page()
-
-    def _show_settings_subpage(self, key: str):
-        th = self.theme
-        # nav highlight
-        for k, btn in self.settings_nav_buttons.items():
-            if k == key:
-                btn.configure(bg=th["sidebar_active"], fg=th["text_primary"], font=("Segoe UI", 10, "bold"))
-            else:
-                btn.configure(bg=th["sidebar_bg"], fg=th["text_secondary"], font=("Segoe UI", 10))
-        # show frame
-        for kk, frm in self.settings_subpages.items():
-            frm.pack_forget()
-        self.settings_subpages[key].pack(fill="both", expand=True)
-        self.current_settings_subpage = key
 
     def _on_sidebar_select(self, key: str):
         if key == "open_folder":
@@ -1556,7 +1966,10 @@ class OmniLauncherApp:
         self.sidebar.set_active(key)
         self._show_page(key)
 
-    # initial load
+    # ------------------------------------------------------------------
+    # Data refresh
+    # ------------------------------------------------------------------
+
     def _initial_load(self):
         self._reload_versions()
         self._refresh_accounts()
@@ -1566,53 +1979,44 @@ class OmniLauncherApp:
         self._load_console_history()
 
     def _reload_versions(self):
-        # update settings filters
-        self.settings.set(self.show_snap_var.get(), "general", "show_snapshots")
-        self.settings.set(self.show_beta_var.get(), "general", "show_beta")
-        self.settings.set(self.show_alpha_var.get(), "general", "show_alpha")
+        self.settings.set(self.show_snap_var.isChecked(), "general", "show_snapshots")
+        self.settings.set(self.show_beta_var.isChecked(), "general", "show_beta")
+        self.settings.set(self.show_alpha_var.isChecked(), "general", "show_alpha")
         self.settings.save()
 
-        def fetch():
-            try:
-                # refresh_cache may take time
-                refresh_cache()
-                versions = get_version_list(self.settings)
-                ids = [v["id"] for v in versions]
-                self.root.after(0, lambda: self._apply_version_list(ids))
-            except Exception as e:
-                self.root.after(0, lambda: self._apply_version_list(get_release_versions(self.settings)))
-
-        threading.Thread(target=fetch, daemon=True).start()
+        self._version_worker = VersionWorker(self.settings)
+        self._version_worker.finished.connect(self._apply_version_list)
+        self._version_worker.start()
 
     def _apply_version_list(self, ids: List[str]):
         if not ids:
             ids = ["1.21.1", "1.20.1"]
-        # update combos
-        try:
-            self.version_combo["values"] = ids
-            if not self.play_version_var.get() or self.play_version_var.get() not in ids:
-                # try selected instance version
-                inst = self.settings.current_instance
-                ver = inst.get("version") or get_latest_version(self.settings)
-                if ver in ids:
-                    self.play_version_var.set(ver)
-                else:
-                    self.play_version_var.set(ids[0])
-                # also set footer
-                self.footer_version_label.configure(text=f"{self.play_version_var.get()} • Vanilla")
-        except Exception:
-            pass
+        self.versions_list = ids
+        self.version_combo.clear()
+        self.version_combo.addItems(ids)
+
+        inst = self.settings.current_instance
+        ver = inst.get("version") or get_latest_version(self.settings)
+        if ver in ids:
+            self.version_combo.setCurrentText(ver)
+        elif ids:
+            self.version_combo.setCurrentText(ids[0])
+        self.footer_version_label.setText(f"{self.version_combo.currentText()} • Vanilla")
 
     def _refresh_play_page(self):
-        th = self.theme
-        inst = self.settings.current_instance if self.settings else {"name": "Latest Release", "version": "1.21.1", "group": "Vanilla", "icon": "grass", "favorite": True}
-        # update play instance card visuals
+        t = self.theme
+        inst = self.settings.current_instance if self.settings else {
+            "name": "Latest Release", "version": "1.21.1", "group": "Vanilla",
+            "icon": "grass", "favorite": True
+        }
+
         try:
-            self.play_inst_name.configure(text=inst.get("name", "Latest Release"))
-            ver = inst.get("version") or self.play_version_var.get() or "1.21.1"
+            self.play_inst_name.setText(inst.get("name", "Latest Release"))
+            ver = inst.get("version") or self.version_combo.currentText() or "1.21.1"
             loader = inst.get("loader", "vanilla")
             group = inst.get("group", "Custom")
-            self.play_inst_details.configure(text=f"{ver} • {loader} • {group}")
+            self.play_inst_details.setText(f"{ver} • {loader} • {group}")
+
             last = inst.get("last_played", "")
             pt = inst.get("playtime_minutes", 0)
             if last:
@@ -1621,68 +2025,104 @@ class OmniLauncherApp:
                     last_s = dt.strftime("%b %d %Y %H:%M")
                 except Exception:
                     last_s = last
-                meta = f"Last played {last_s} • {pt//60}h {pt%60}m"
+                meta = f"Last played {last_s} • {pt // 60}h {pt % 60}m"
             else:
-                meta = "Never played" if not pt else f"Playtime {pt//60}h {pt%60}m"
-            self.play_inst_meta.configure(text=meta)
-            self.footer_version_label.configure(text=f"{ver} • {loader}")
+                meta = "Never played" if not pt else f"Playtime {pt // 60}h {pt % 60}m"
+            self.play_inst_meta.setText(meta)
+            self.footer_version_label.setText(f"{ver} • {loader}")
 
-            # icon
-            self.play_inst_icon.delete("all")
+            # Icon
             icon_name = inst.get("icon", "grass")
-            from omnilauncher.gui.components.cards import ICON_COLORS
-            col = ICON_COLORS.get(icon_name, th["accent"])
-            self.play_inst_icon.create_rectangle(8, 8, 72, 72, fill=col, outline="", width=0)
-            self.play_inst_icon.create_text(40, 42, text=inst.get("name", "?")[:1].upper(), font=("Segoe UI", 24, "bold"), fill="white")
-            if inst.get("favorite"):
-                self.play_inst_icon.create_text(64, 16, text="★", font=("Segoe UI", 14), fill="#ffcc00")
+            color = ICON_COLORS.get(icon_name, t["accent"])
+            fav = inst.get("favorite", False)
+            border = f"border: 2px solid #ffcc00;" if fav else ""
+            self.play_inst_icon.setText(inst.get("name", "?")[:1].upper())
+            self.play_inst_icon.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {color};
+                    color: white;
+                    border-radius: 12px;
+                    font-size: 28px;
+                    font-weight: bold;
+                    {border}
+                }}
+            """)
 
-            # versions
-            if not self.play_version_var.get():
-                self.play_version_var.set(ver)
+            if not self.version_combo.currentText():
+                self.version_combo.setCurrentText(ver)
 
-            # fav list small
-            for w in self.play_fav_frame.winfo_children():
-                w.destroy()
+            # Favorites
+            # Clear existing fav items
+            while self.play_fav_layout.count():
+                item = self.play_fav_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
             favs = [i for i in self.settings.get("instances", "list", default=[]) if i.get("favorite")][:5]
             if not favs:
                 favs = self.settings.get("instances", "list", default=[])[:5]
             for fav in favs:
-                f = tk.Frame(self.play_fav_frame, bg=th["card_bg"], highlightthickness=1, highlightbackground=th["card_border"])
-                f.pack(fill="x", pady=4)
-                tk.Label(f, text=fav.get("name", "Instance"), font=("Segoe UI", 9, "bold"), bg=th["card_bg"], fg=th["text_primary"]).pack(side="left", padx=8, pady=8)
-                tk.Label(f, text=fav.get("version", ""), font=("Segoe UI", 8), bg=th["card_bg"], fg=th["text_secondary"]).pack(side="left")
-                tk.Button(f, text="▶", font=("Segoe UI", 8, "bold"), bg=th["accent"], fg="white", bd=0, command=lambda iid=fav["id"]: self._play_instance(iid)).pack(side="right", padx=8)
+                card = make_card_frame(t)
+                card.setFixedHeight(48)
+                cl = QHBoxLayout(card)
+                cl.setContentsMargins(8, 4, 8, 4)
+                name = QLabel(fav.get("name", "Instance"))
+                name.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                name.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+                cl.addWidget(name)
+                ver_lbl = QLabel(fav.get("version", ""))
+                ver_lbl.setFont(QFont("Segoe UI", 8))
+                ver_lbl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+                cl.addWidget(ver_lbl)
+                cl.addStretch()
+                play_btn = QPushButton("▶")
+                play_btn.setFixedSize(32, 32)
+                play_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {t['accent']};
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-weight: bold;
+                    }}
+                    QPushButton:hover {{ background-color: {t['accent_hover']}; }}
+                """)
+                play_btn.clicked.connect(lambda checked, iid=fav["id"]: self._play_instance(iid))
+                cl.addWidget(play_btn)
+                self.play_fav_layout.addWidget(card)
 
-            # accounts combo
+            # Accounts combo
             accs = self.settings.get("accounts", "list", default=[])
             names = [a.get("username", "Steve") for a in accs]
-            self.account_combo["values"] = names
+            self.account_combo.clear()
+            self.account_combo.addItems(names)
             sel_idx = self.settings.get("accounts", "selected_index", default=0)
             if 0 <= sel_idx < len(names):
-                self.play_account_var.set(names[sel_idx])
-                self.play_account_sub.configure(text=f"{accs[sel_idx].get('type','offline')} • {accs[sel_idx].get('skin_type','steve')}")
-            # sidebar user
+                self.account_combo.setCurrentText(names[sel_idx])
+                self.play_account_sub.setText(f"{accs[sel_idx].get('type', 'offline')} • {accs[sel_idx].get('skin_type', 'steve')}")
+
             if accs and 0 <= sel_idx < len(accs):
                 self.sidebar.update_user(names[sel_idx], "Ready • Offline")
 
-        except Exception as e:
-            # silent
+        except Exception:
             pass
 
     def _refresh_instances(self):
-        th = self.theme
-        if not hasattr(self, "instances_scroll"):
-            return
-        for w in self.instances_scroll.inner.winfo_children():
-            w.destroy()
+        t = self.theme
+        # Clear existing
+        while self.instances_layout.count():
+            item = self.instances_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         instances = self.settings.get("instances", "list", default=[]) if self.settings else []
-        search = self.search_var.get().lower()
+        search = self.search_input.text().lower() if hasattr(self, 'search_input') else ""
         if search:
-            instances = [i for i in instances if search in i.get("name", "").lower() or search in i.get("version", "").lower() or search in i.get("group", "").lower()]
+            instances = [i for i in instances if search in i.get("name", "").lower()
+                         or search in i.get("version", "").lower()
+                         or search in i.get("group", "").lower()]
 
-        sort_by = self.sort_var.get() if hasattr(self, "sort_var") else "last_played"
+        sort_by = self.sort_combo.currentText() if hasattr(self, 'sort_combo') else "last_played"
         if sort_by == "name":
             instances = sorted(instances, key=lambda x: x.get("name", "").lower())
         elif sort_by == "version":
@@ -1697,76 +2137,76 @@ class OmniLauncherApp:
                     return datetime.datetime.min
             instances = sorted(instances, key=lp_key, reverse=True)
 
-        # groups
+        # Group
         groups: Dict[str, List[Dict]] = {}
         for inst in instances:
             g = inst.get("group", "Other")
             groups.setdefault(g, []).append(inst)
 
         for group_name, group_insts in groups.items():
-            lbl = tk.Label(self.instances_scroll.inner, text=f"{group_name} ({len(group_insts)})", font=("Segoe UI", 10, "bold"), bg=th["bg"], fg=th["text_secondary"])
-            lbl.pack(anchor="w", padx=8, pady=(16, 4))
+            lbl = QLabel(f"{group_name} ({len(group_insts)})")
+            lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"color: {t['text_secondary']};")
+            self.instances_layout.addWidget(lbl)
 
-            grid_frame = tk.Frame(self.instances_scroll.inner, bg=th["bg"])
-            grid_frame.pack(fill="x", padx=4)
+            view = self.view_mode_btn.text().lower() if hasattr(self, 'view_mode_btn') else "grid"
 
-            # decide layout: grid vs list
-            view = self.view_mode_var.get() if hasattr(self, "view_mode_var") else "grid"
             if view == "grid":
-                # flow grid approx 3 columns
-                row = tk.Frame(grid_frame, bg=th["bg"])
-                row.pack(fill="x")
-                col_count = 0
+                grid_widget = QWidget()
+                grid = QGridLayout(grid_widget)
+                grid.setSpacing(8)
+                col = 0
+                row = 0
                 for inst in group_insts:
-                    if col_count >= 3:
-                        row = tk.Frame(grid_frame, bg=th["bg"])
-                        row.pack(fill="x")
-                        col_count = 0
-                    card_container = tk.Frame(row, bg=th["bg"])
-                    card_container.pack(side="left", fill="x", expand=True, padx=6, pady=6)
-                    card = InstanceCard(card_container, inst, th, self._play_instance, self._select_instance, self._instance_context)
-                    card.pack(fill="x")
-                    col_count += 1
+                    card = InstanceCard(inst, t)
+                    card.play_clicked.connect(self._play_instance)
+                    card.select_clicked.connect(self._select_instance)
+                    card.context_menu.connect(self._instance_context)
+                    grid.addWidget(card, row, col)
+                    col += 1
+                    if col >= 3:
+                        col = 0
+                        row += 1
+                self.instances_layout.addWidget(grid_widget)
             else:
                 for inst in group_insts:
-                    card = InstanceCard(grid_frame, inst, th, self._play_instance, self._select_instance, self._instance_context)
-                    card.pack(fill="x", padx=6, pady=4)
+                    card = InstanceCard(inst, t)
+                    card.play_clicked.connect(self._play_instance)
+                    card.select_clicked.connect(self._select_instance)
+                    card.context_menu.connect(self._instance_context)
+                    self.instances_layout.addWidget(card)
+
+        self.instances_layout.addStretch()
 
     def _refresh_accounts(self):
-        th = self.theme
-        if not hasattr(self, "accounts_scroll"):
-            return
-        for w in self.accounts_scroll.inner.winfo_children():
-            w.destroy()
+        t = self.theme
+        # Clear existing
+        while self.accounts_layout.count():
+            item = self.accounts_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         accs = self.settings.get("accounts", "list", default=[])
         sel_idx = self.settings.get("accounts", "selected_index", default=0)
 
         for idx, acc in enumerate(accs):
-            card = AccountCard(
-                self.accounts_scroll.inner,
-                acc,
-                th,
-                idx,
-                idx == sel_idx,
-                self._select_account,
-                self._remove_account,
-            )
-            card.pack(fill="x", pady=6)
+            card = AccountCard(acc, t, idx, idx == sel_idx)
+            card.select_clicked.connect(self._select_account)
+            card.delete_clicked.connect(self._remove_account)
+            self.accounts_layout.addWidget(card)
+
+        self.accounts_layout.addStretch()
 
     def _refresh_java_list(self):
-        def fetch():
-            javas = find_java_executables()
-            self.root.after(0, lambda: self._apply_java_list(javas))
-        threading.Thread(target=fetch, daemon=True).start()
+        self._java_worker = JavaWorker()
+        self._java_worker.finished.connect(self._apply_java_list)
+        self._java_worker.start()
 
     def _apply_java_list(self, javas: List[Dict[str, str]]):
-        try:
-            self.java_detected_listbox.delete(0, "end")
+        if hasattr(self, 'java_list_widget'):
+            self.java_list_widget.clear()
             for j in javas:
-                self.java_detected_listbox.insert("end", f"{j.get('version','?')} • {j.get('path','')} [{j.get('source','')}]")
-        except Exception:
-            pass
+                self.java_list_widget.addItem(f"{j.get('version', '?')} • {j.get('path', '')} [{j.get('source', '')}]")
 
     def _load_console_history(self):
         if launcher_svc:
@@ -1776,7 +2216,9 @@ class OmniLauncherApp:
             except Exception:
                 pass
 
-    # actions
+    # ------------------------------------------------------------------
+    # Actions
+    # ------------------------------------------------------------------
 
     def _play_instance(self, inst_id: str):
         self.settings.set_selected_instance(inst_id)
@@ -1788,19 +2230,22 @@ class OmniLauncherApp:
         self._refresh_play_page()
         self._refresh_instances()
 
-    def _instance_context(self, inst_id: str, x_root: int, y_root: int):
-        menu = tk.Menu(self.root, tearoff=0)
-        menu.add_command(label="Play", command=lambda: self._play_instance(inst_id))
-        menu.add_command(label="Edit", command=lambda: self._show_edit_instance_dialog(inst_id))
-        menu.add_command(label="Duplicate", command=lambda: self._duplicate_instance(inst_id))
-        menu.add_command(label="Toggle Favorite", command=lambda: (self.instance_svc.toggle_favorite(inst_id) if self.instance_svc else None, self._refresh_instances(), self._refresh_play_page()))
-        menu.add_separator()
-        menu.add_command(label="Open Folder", command=lambda: self._open_instance_folder(inst_id))
-        menu.add_command(label="Delete", command=lambda: self._delete_instance(inst_id))
-        try:
-            menu.tk_popup(x_root, y_root)
-        finally:
-            menu.grab_release()
+    def _instance_context(self, inst_id: str, global_pos):
+        menu = QMenu(self)
+        menu.addAction("Play", lambda: self._play_instance(inst_id))
+        menu.addAction("Edit", lambda: self._show_edit_instance_dialog(inst_id))
+        menu.addAction("Duplicate", lambda: self._duplicate_instance(inst_id))
+        menu.addAction("Toggle Favorite", lambda: self._toggle_favorite(inst_id))
+        menu.addSeparator()
+        menu.addAction("Open Folder", lambda: self._open_instance_folder(inst_id))
+        menu.addAction("Delete", lambda: self._delete_instance(inst_id))
+        menu.exec(global_pos)
+
+    def _toggle_favorite(self, inst_id: str):
+        if self.instance_svc:
+            self.instance_svc.toggle_favorite(inst_id)
+        self._refresh_instances()
+        self._refresh_play_page()
 
     def _open_instance_folder(self, inst_id: str):
         inst = next((i for i in self.settings.get("instances", "list", default=[]) if i.get("id") == inst_id), None)
@@ -1813,7 +2258,9 @@ class OmniLauncherApp:
             open_folder(self.settings.minecraft_dir)
 
     def _delete_instance(self, inst_id: str):
-        if messagebox.askyesno("Delete Instance", f"Delete instance {inst_id}? Worlds inside instance folder may be removed."):
+        reply = QMessageBox.question(self, "Delete Instance", f"Delete instance {inst_id}?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             self.settings.remove_instance(inst_id)
             self._refresh_instances()
             self._refresh_play_page()
@@ -1826,113 +2273,131 @@ class OmniLauncherApp:
             self._refresh_instances()
 
     def _show_new_instance_dialog(self):
-        th = self.theme
-        top = tk.Toplevel(self.root)
-        top.title("New Instance")
-        top.configure(bg=th["bg"])
-        top.geometry("420x460")
-        top.transient(self.root)
-        top.grab_set()
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton
+        t = self.theme
 
-        tk.Label(top, text="Create New Instance", font=("Segoe UI", 12, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(pady=16)
+        dlg = QDialog(self)
+        dlg.setWindowTitle("New Instance")
+        dlg.setFixedSize(420, 460)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
 
-        # name
-        tk.Label(top, text="Name", bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20)
-        name_var = tk.StringVar(value="My Instance")
-        tk.Entry(top, textvariable=name_var, bg=th["input_bg"], fg=th["text_primary"], bd=0, font=("Segoe UI", 10)).pack(fill="x", padx=20, pady=4, ipady=4)
+        layout.addWidget(make_section_label("Create New Instance", t, 12))
 
-        tk.Label(top, text="Version", bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 0))
-        ver_var = tk.StringVar(value=self.play_version_var.get() or get_latest_version(self.settings))
-        # get all versions for combo
-        all_ids = self.version_combo["values"] if hasattr(self, "version_combo") else ["1.21.1"]
-        ttk.Combobox(top, textvariable=ver_var, values=all_ids, state="readonly").pack(fill="x", padx=20, pady=4)
+        layout.addWidget(QLabel("Name"))
+        name_edit = QLineEdit("My Instance")
+        layout.addWidget(name_edit)
 
-        tk.Label(top, text="Group", bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 0))
-        group_var = tk.StringVar(value="Custom")
-        ttk.Combobox(top, textvariable=group_var, values=["Vanilla", "Modded", "Custom", "Snapshots", "Testing"], state="normal").pack(fill="x", padx=20, pady=4)
+        layout.addWidget(QLabel("Version"))
+        ver_combo = QComboBox()
+        ver_combo.addItems(self.versions_list or ["1.21.1"])
+        ver_combo.setEditable(True)
+        layout.addWidget(ver_combo)
 
-        tk.Label(top, text="Icon", bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 0))
-        icon_var = tk.StringVar(value="grass")
-        ttk.Combobox(top, textvariable=icon_var, values=BLOCK_ICONS, state="readonly").pack(fill="x", padx=20, pady=4)
+        layout.addWidget(QLabel("Group"))
+        group_combo = QComboBox()
+        group_combo.addItems(["Vanilla", "Modded", "Custom", "Snapshots", "Testing"])
+        group_combo.setEditable(True)
+        layout.addWidget(group_combo)
 
-        tk.Label(top, text="Loader", bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 0))
-        loader_var = tk.StringVar(value="vanilla")
-        ttk.Combobox(top, textvariable=loader_var, values=["vanilla", "forge", "fabric", "quilt", "neoforge"], state="readonly").pack(fill="x", padx=20, pady=4)
+        layout.addWidget(QLabel("Icon"))
+        icon_combo = QComboBox()
+        icon_combo.addItems(BLOCK_ICONS)
+        layout.addWidget(icon_combo)
+
+        layout.addWidget(QLabel("Loader"))
+        loader_combo = QComboBox()
+        loader_combo.addItems(["vanilla", "forge", "fabric", "quilt", "neoforge"])
+        layout.addWidget(loader_combo)
 
         def create():
-            name = name_var.get().strip() or "New Instance"
-            ver = ver_var.get().strip()
+            name = name_edit.text().strip() or "New Instance"
+            ver = ver_combo.currentText().strip()
             if not ver:
-                messagebox.showwarning("Validation", "Version required")
+                QMessageBox.warning(dlg, "Validation", "Version required")
                 return
-            inst = self.settings.add_instance(name, ver, icon_var.get(), group_var.get())
-            inst["loader"] = loader_var.get()
+            inst = self.settings.add_instance(name, ver, icon_combo.currentText(), group_combo.currentText())
+            inst["loader"] = loader_combo.currentText()
             self.settings.save()
-            top.destroy()
+            dlg.accept()
             self._refresh_instances()
             self._refresh_play_page()
             self._show_page("instances")
 
-        tk.Button(top, text="Create", bg=th["accent"], fg="white", bd=0, font=("Segoe UI", 10, "bold"), command=create, padx=20, pady=8).pack(pady=16)
+        create_btn = make_accent_button("Create", t)
+        create_btn.clicked.connect(create)
+        layout.addWidget(create_btn)
+
+        dlg.exec()
 
     def _show_edit_instance_dialog(self, inst_id: str):
-        th = self.theme
+        t = self.theme
         inst = next((i for i in self.settings.get("instances", "list", default=[]) if i.get("id") == inst_id), None)
         if not inst:
             return
-        top = tk.Toplevel(self.root)
-        top.title(f"Edit {inst.get('name','')}")
-        top.configure(bg=th["bg"])
-        top.geometry("440x500")
-        top.transient(self.root)
-        top.grab_set()
 
-        tk.Label(top, text=f"Edit {inst.get('name')}", font=("Segoe UI", 12, "bold"), bg=th["bg"], fg=th["text_primary"]).pack(pady=16)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Edit {inst.get('name', '')}")
+        dlg.setFixedSize(440, 420)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
 
-        name_var = tk.StringVar(value=inst.get("name", ""))
-        ver_var = tk.StringVar(value=inst.get("version", ""))
-        group_var = tk.StringVar(value=inst.get("group", "Custom"))
-        icon_var = tk.StringVar(value=inst.get("icon", "grass"))
-        ram_var = tk.StringVar(value=str(inst.get("ram_override") or ""))
+        layout.addWidget(make_section_label(f"Edit {inst.get('name')}", t, 12))
 
-        def row(label, var):
-            tk.Label(top, text=label, bg=th["bg"], fg=th["text_secondary"], font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 0))
-            tk.Entry(top, textvariable=var, bg=th["input_bg"], fg=th["text_primary"], bd=0).pack(fill="x", padx=20, pady=4, ipady=4)
+        name_edit = QLineEdit(inst.get("name", ""))
+        layout.addWidget(QLabel("Name"))
+        layout.addWidget(name_edit)
 
-        row("Name", name_var)
-        row("Version", ver_var)
-        row("Group", group_var)
-        row("Icon", icon_var)
-        row("RAM Override (MB, empty = use global)", ram_var)
+        ver_edit = QLineEdit(inst.get("version", ""))
+        layout.addWidget(QLabel("Version"))
+        layout.addWidget(ver_edit)
+
+        group_edit = QLineEdit(inst.get("group", "Custom"))
+        layout.addWidget(QLabel("Group"))
+        layout.addWidget(group_edit)
+
+        icon_edit = QLineEdit(inst.get("icon", "grass"))
+        layout.addWidget(QLabel("Icon"))
+        layout.addWidget(icon_edit)
+
+        ram_edit = QLineEdit(str(inst.get("ram_override") or ""))
+        layout.addWidget(QLabel("RAM Override (MB, empty = use global)"))
+        layout.addWidget(ram_edit)
 
         def save():
-            inst["name"] = name_var.get()
-            inst["version"] = ver_var.get()
-            inst["group"] = group_var.get()
-            inst["icon"] = icon_var.get()
+            inst["name"] = name_edit.text()
+            inst["version"] = ver_edit.text()
+            inst["group"] = group_edit.text()
+            inst["icon"] = icon_edit.text()
             try:
-                inst["ram_override"] = int(ram_var.get()) if ram_var.get().strip() else None
+                inst["ram_override"] = int(ram_edit.text()) if ram_edit.text().strip() else None
             except Exception:
                 inst["ram_override"] = None
             self.settings.save()
-            top.destroy()
+            dlg.accept()
             self._refresh_instances()
             self._refresh_play_page()
 
-        tk.Button(top, text="Save", bg=th["accent"], fg="white", bd=0, command=save, padx=20, pady=8).pack(pady=16)
+        save_btn = make_accent_button("Save", t)
+        save_btn.clicked.connect(save)
+        layout.addWidget(save_btn)
+
+        dlg.exec()
 
     def _add_account(self):
-        name = self.new_account_name.get().strip()
+        name = self.new_account_name.text().strip()
         if not name:
-            messagebox.showwarning("Account", "Enter username")
+            QMessageBox.warning(self, "Account", "Enter username")
             return
         try:
-            self.account_svc.add_offline(name, self.new_account_skin.get())
-            self.new_account_name.set("")
+            self.account_svc.add_offline(name, self.new_account_skin.currentText())
+            self.new_account_name.setText("")
             self._refresh_accounts()
             self._refresh_play_page()
         except Exception as e:
-            messagebox.showerror("Account", f"Failed: {e}")
+            QMessageBox.critical(self, "Account", f"Failed: {e}")
 
     def _select_account(self, idx: int):
         self.settings.select_account(idx)
@@ -1940,13 +2405,14 @@ class OmniLauncherApp:
         self._refresh_play_page()
 
     def _remove_account(self, uuid_str: str):
-        if messagebox.askyesno("Remove Account", "Remove this account?"):
+        reply = QMessageBox.question(self, "Remove Account", "Remove this account?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             self.settings.remove_account(uuid_str)
             self._refresh_accounts()
             self._refresh_play_page()
 
-    def _on_account_combo_changed(self):
-        name = self.play_account_var.get()
+    def _on_account_combo_changed(self, name: str):
         accs = self.settings.get("accounts", "list", default=[])
         for idx, acc in enumerate(accs):
             if acc.get("username") == name:
@@ -1954,306 +2420,226 @@ class OmniLauncherApp:
                 self._refresh_play_page()
                 break
 
-    def _on_play_version_changed(self):
-        ver = self.play_version_var.get()
-        # update current instance version if default?
+    def _on_play_version_changed(self, ver: str):
         inst = self.settings.current_instance
         if inst:
-            # if user changes version on play page, update instance's version if it's the selected instance?
-            # keep but also update footer
-            self.footer_version_label.configure(text=f"{ver} • {inst.get('loader','vanilla')}")
-            # optional: save to instance if user wants? We'll save
+            self.footer_version_label.setText(f"{ver} • {inst.get('loader', 'vanilla')}")
             inst["version"] = ver
             self.settings.save()
 
+    def _on_ram_changed(self, value: int, label: QLabel):
+        label.setText(f"RAM: {value} MB")
+        self.settings.set(value, "java", "max_ram_mb")
+
     def _quick_play(self, name: str):
-        messagebox.showinfo("Quick Play", f"Quick play {name} - launching default instance with quick play map/server logic (placeholder).")
+        QMessageBox.information(self, "Quick Play", f"Quick play {name} - launching with quick play logic (placeholder).")
         self._on_launch_clicked()
 
     def _on_launch_clicked(self):
-        # get selected account and version and instance
         accs = self.settings.get("accounts", "list", default=[])
         sel_idx = self.settings.get("accounts", "selected_index", default=0)
         if not (0 <= sel_idx < len(accs)):
-            messagebox.showwarning("Launch", "No account selected")
+            QMessageBox.warning(self, "Launch", "No account selected")
             return
         username = accs[sel_idx].get("username", "Steve")
-        version = self.play_version_var.get()
+        version = self.version_combo.currentText()
         if not version:
-            messagebox.showwarning("Launch", "Select version")
+            QMessageBox.warning(self, "Launch", "Select version")
             return
-        ram_mb = int(self.ram_var.get())
+        ram_mb = self.ram_slider.value()
         inst_id = self.settings.get("instances", "selected", default="default")
 
-        # if account not matching combobox? already synced
-        # disable button temporarily
-        self.launch_btn.configure(state="disabled", text="Launching...")
-        self.status_var.set(f"Launching {version} as {username}...")
+        self.launch_btn.setEnabled(False)
+        self.launch_btn.setText("Launching...")
+        self.status_label.setText(f"Launching {version} as {username}...")
 
-        # check lib
         try:
             from omnilauncher.services.launcher import launch
-
             launch(username, version, ram_mb, self.settings, inst_id)
         except Exception as e:
-            messagebox.showerror("Launch Error", f"Failed to launch: {e}")
-            self.launch_btn.configure(state="normal", text="▶  PLAY")
-            self.status_var.set("Ready")
+            QMessageBox.critical(self, "Launch Error", f"Failed to launch: {e}")
+            self.launch_btn.setEnabled(True)
+            self.launch_btn.setText("▶  PLAY")
+            self.status_label.setText("Ready")
 
     def _on_status_update(self, status: str):
-        self.root.after(0, lambda: self.status_var.set(status))
-        self.root.after(0, lambda: self.sidebar.update_user(self.settings.current_account.get("username", "Steve"), status))
-        # re-enable launch when done/ready
+        QTimer.singleShot(0, lambda: self.status_label.setText(status))
+        QTimer.singleShot(0, lambda: self.sidebar.update_user(
+            self.settings.current_account.get("username", "Steve"), status))
         if status in ("Ready", "Done") or status.startswith("Exited") or "failed" in status.lower():
-            self.root.after(0, lambda: self.launch_btn.configure(state="normal", text="▶  PLAY"))
+            QTimer.singleShot(0, lambda: (self.launch_btn.setEnabled(True), self.launch_btn.setText("▶  PLAY")))
 
     def _on_progress_update(self, prog: int, max_v: int):
         def upd():
-            self.progress_max = max_v if max_v > 0 else 100
-            percent = int((prog / self.progress_max) * 100) if self.progress_max else 0
-            self.progress_var.set(percent)
-        self.root.after(0, upd)
+            pct = int((prog / max(max_v, 1)) * 100)
+            self.progress_bar.setValue(pct)
+        QTimer.singleShot(0, upd)
 
     def _on_console_line(self, line: str):
-        self.root.after(0, lambda: self._append_console_line(line))
+        QTimer.singleShot(0, lambda: self._append_console_line(line))
 
     def _append_console_line(self, line: str):
         try:
-            if not hasattr(self, "console_text") or not self.console_text.winfo_exists():
+            if not hasattr(self, "console_text"):
                 return
-            self.console_text.configure(state="normal")
-            # simple tag logic
-            tag = "info"
-            if "[ERROR]" in line or " ERROR " in line or "Exception" in line or "FAILED" in line:
-                tag = "error"
-            elif "[WARN]" in line or " WARN " in line:
-                tag = "warn"
-
-            timestamp = ""
-            if self.settings.get("launcher", "console_show_timestamp", default=True):
-                timestamp = datetime.datetime.now().strftime("%H:%M:%S ")
-
-            if timestamp:
-                self.console_text.insert("end", timestamp, "timestamp")
-
-            self.console_text.insert("end", line, tag)
-            if self.console_autoscroll_var.get() if hasattr(self, "console_autoscroll_var") else True:
-                self.console_text.see("end")
-            # limit lines
-            lines = int(self.console_text.index("end-1c").split(".")[0])
-            if lines > 5000:
-                self.console_text.delete("1.0", f"{lines-4000}.0")
-            self.console_text.configure(state="disabled")
+            self.console_text.appendPlainText(line.rstrip())
+            if self.console_autoscroll_chk.isChecked():
+                scrollbar = self.console_text.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
+            # Limit lines
+            doc = self.console_text.document()
+            if doc.blockCount() > 5000:
+                cursor = self.console_text.textCursor()
+                cursor.movePosition(cursor.MoveOperation.Start)
+                cursor.movePosition(cursor.MoveOperation.Down, cursor.MoveMode.KeepAnchor, doc.blockCount() - 4000)
+                cursor.removeSelectedText()
         except Exception:
             pass
 
     def _poll_launcher_state(self):
         try:
             if launcher_svc:
-                st = launcher_svc.current_status
-                self.status_var.set(st)
-                # progress
+                self.status_label.setText(launcher_svc.current_status)
                 prog = launcher_svc.current_progress
                 mx = launcher_svc.current_max
                 if mx > 0:
-                    pct = int((prog / mx) * 100)
-                    self.progress_var.set(pct)
+                    self.progress_bar.setValue(int((prog / mx) * 100))
         except Exception:
             pass
-        self.root.after(200, self._poll_launcher_state)
+        QTimer.singleShot(200, self._poll_launcher_state)
 
-    # settings helpers
+    # ------------------------------------------------------------------
+    # Console actions
+    # ------------------------------------------------------------------
 
-    def _browse_folder(self, entry_widget: tk.Entry):
-        folder = filedialog.askdirectory()
-        if folder:
-            entry_widget.delete(0, "end")
-            entry_widget.insert(0, folder)
-            self.settings.set(folder, "general", "minecraft_directory")
-            self.settings.save()
-
-    def _browse_file(self, var: tk.StringVar):
-        file = filedialog.askopenfilename(title="Select Java executable", filetypes=[("Java", "java*"), ("All", "*.*")])
-        if file:
-            var.set(file)
-
-    def _change_theme(self, name: str):
-        self.settings.set(name, "appearance", "theme")
-        self.settings.save()
-        # apply partially
-        self.theme = get_theme(name)
-        self.theme_name = name
-        try:
-            self.root.configure(bg=self.theme["bg"])
-            self.header_frame.configure(bg=self.theme["header_bg"])
-            self.header_title.configure(bg=self.theme["header_bg"], fg=self.theme["text_primary"])
-            self.header_sub.configure(bg=self.theme["header_bg"])
-            self.footer_frame.configure(bg=self.theme["footer_bg"])
-            self.status_label.configure(bg=self.theme["footer_bg"])
-            self.footer_version_label.configure(bg=self.theme["footer_bg"])
-            self._configure_styles()
-            messagebox.showinfo("Theme", f"Theme changed to {name}. Some colors will apply after restart for full effect.")
-        except Exception:
-            pass
-
-    def _export_settings(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
-        if path:
-            try:
-                with open(path, "w") as f:
-                    json.dump(self.settings.data, f, indent=2)
-                messagebox.showinfo("Export", f"Settings exported to {path}")
-            except Exception as e:
-                messagebox.showerror("Export", f"Failed: {e}")
-
-    def _reset_settings(self):
-        if messagebox.askyesno("Reset", "Reset all settings to defaults? This cannot be undone."):
-            from omnilauncher.config.settings import DEFAULT_SETTINGS, SettingsManager
-
-            self.settings._data = SettingsManager._deep_copy(DEFAULT_SETTINGS)
-            self.settings.save()
-            messagebox.showinfo("Reset", "Settings reset. Restart launcher.")
-            self._initial_load()
-
-    def _delete_all_data(self):
-        if messagebox.askyesno("Warning", "Delete ALL Minecraft data in minecraft folder? This will remove worlds!"):
-            mc_dir = self.settings.minecraft_dir
-            try:
-                import shutil
-
-                shutil.rmtree(mc_dir)
-                messagebox.showinfo("Deleted", f"Deleted {mc_dir}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed: {e}")
-
-    def _toggle_view_mode(self):
-        cur = self.view_mode_var.get()
-        new = "list" if cur == "grid" else "grid"
-        self.view_mode_var.set(new)
-        self.settings.set(new, "instances", "view_mode")
-        self.settings.save()
-        self._refresh_instances()
-
-    def _draw_skin_preview(self, skin_type: str):
-        try:
-            c = self.skin_canvas
-            c.delete("all")
-            th = self.theme
-            c.configure(bg=th["input_bg"])
-            # simple steve
-            c.create_rectangle(80, 20, 120, 50, fill="#e8c4a8", outline="")
-            c.create_rectangle(70, 50, 130, 110, fill=th["accent"], outline="")
-            c.create_rectangle(50, 50, 70, 90, fill="#e8c4a8", outline="")
-            c.create_rectangle(130, 50, 150, 90, fill="#e8c4a8", outline="")
-            c.create_rectangle(80, 110, 100, 170, fill="#3a6ea5", outline="")
-            c.create_rectangle(100, 110, 120, 170, fill="#3a6ea5", outline="")
-            if skin_type == "alex":
-                c.create_text(100, 200, text="Alex (slim)", fill=th["text_muted"], font=("Segoe UI", 9))
-            else:
-                c.create_text(100, 200, text="Steve (classic)", fill=th["text_muted"], font=("Segoe UI", 9))
-        except Exception:
-            pass
-
-    def _apply_skin_type(self):
-        st = self.skin_type_var.get()
-        self._draw_skin_preview(st)
-        # update current account skin type
-        idx = self.settings.get("accounts", "selected_index", default=0)
-        accs = self.settings.get("accounts", "list", default=[])
-        if 0 <= idx < len(accs):
-            accs[idx]["skin_type"] = st
-            self.settings.save()
-            self._refresh_accounts()
-            messagebox.showinfo("Skin", f"Skin type set to {st}")
-
-    # console actions
     def _clear_console(self):
-        try:
-            self.console_text.configure(state="normal")
-            self.console_text.delete("1.0", "end")
-            self.console_text.configure(state="disabled")
-        except Exception:
-            pass
+        self.console_text.clear()
 
     def _copy_console(self):
-        try:
-            txt = self.console_text.get("1.0", "end")
-            self.root.clipboard_clear()
-            self.root.clipboard_append(txt)
-            messagebox.showinfo("Copied", "Console copied to clipboard.")
-        except Exception:
-            pass
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.console_text.toPlainText())
+        QMessageBox.information(self, "Copied", "Console copied to clipboard.")
 
     def _export_console(self):
-        path = filedialog.asksaveasfilename(defaultextension=".log", filetypes=[("Log", "*.log"), ("Text", "*.txt")])
+        path, _ = QFileDialog.getSaveFileName(self, "Export Console", "", "Log (*.log);;Text (*.txt)")
         if path:
             try:
                 with open(path, "w", encoding="utf-8") as f:
-                    f.write(self.console_text.get("1.0", "end"))
-                messagebox.showinfo("Export", f"Console exported to {path}")
+                    f.write(self.console_text.toPlainText())
+                QMessageBox.information(self, "Export", f"Console exported to {path}")
             except Exception as e:
-                messagebox.showerror("Export", f"Failed: {e}")
+                QMessageBox.critical(self, "Export", f"Failed: {e}")
 
     def _console_search(self):
-        query = self.console_search_var.get()
+        query = self.console_search_edit.text()
         if not query:
             return
-        try:
-            self.console_text.tag_remove("search", "1.0", "end")
-            self.console_text.tag_configure("search", background="yellow", foreground="black")
-            start = "1.0"
-            while True:
-                pos = self.console_text.search(query, start, stopindex="end")
-                if not pos:
-                    break
-                end = f"{pos}+{len(query)}c"
-                self.console_text.tag_add("search", pos, end)
-                start = end
-            self.console_text.see(pos)
-        except Exception:
-            pass
+        # Simple highlight - find and select
+        cursor = self.console_text.textCursor()
+        cursor.movePosition(cursor.MoveOperation.Start)
+        self.console_text.setTextCursor(cursor)
+        found = self.console_text.find(query)
+        if not found:
+            QMessageBox.information(self, "Search", f"'{query}' not found.")
 
     def _analyze_crash(self):
         try:
-            log = self.console_text.get("1.0", "end")
+            log = self.console_text.toPlainText()
             findings = analyze_crash(log)
             if CrashReportDialog is None:
-                messagebox.showinfo("Crash Analyzer", "\n".join([f"{f['title']}: {f['description']}\nFix: {f['fix']}" for f in findings]) or "No issues detected.")
+                QMessageBox.information(self, "Crash Analyzer",
+                                        "\n".join([f"{f['title']}: {f['description']}\nFix: {f['fix']}" for f in findings]) or "No issues detected.")
                 return
-            CrashReportDialog(self.root, self.theme, log, findings)
+            dlg = CrashReportDialog(self.theme, log, findings, self)
+            dlg.exec()
         except Exception as e:
-            messagebox.showerror("Analyze", f"Failed: {e}")
+            QMessageBox.critical(self, "Analyze", f"Failed: {e}")
 
     def _open_file_explorer(self):
         try:
             if FileExplorerDialog is None:
                 open_folder(self.settings.minecraft_dir)
                 return
-            FileExplorerDialog(self.root, self.theme, self.settings.minecraft_dir)
+            dlg = FileExplorerDialog(self.theme, self.settings.minecraft_dir, self)
+            dlg.exec()
         except Exception as e:
-            messagebox.showerror("File Explorer", f"Failed: {e}\nOpening folder externally.")
+            QMessageBox.critical(self, "File Explorer", f"Failed: {e}")
             open_folder(self.settings.minecraft_dir)
+
+    # ------------------------------------------------------------------
+    # Settings actions
+    # ------------------------------------------------------------------
+
+    def _browse_mc_dir(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Minecraft Directory")
+        if folder:
+            self.mc_dir_edit.setText(folder)
+            self.settings.set(folder, "general", "minecraft_directory")
+            self.settings.save()
+
+    def _browse_java(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Select Java executable", "", "Java (java*);;All (*)")
+        if file:
+            self.java_path_edit.setText(file)
+
+    def _export_settings(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export Settings", "", "JSON (*.json)")
+        if path:
+            try:
+                with open(path, "w") as f:
+                    json.dump(self.settings.data, f, indent=2)
+                QMessageBox.information(self, "Export", f"Settings exported to {path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Export", f"Failed: {e}")
+
+    def _reset_settings(self):
+        reply = QMessageBox.question(self, "Reset", "Reset all settings to defaults?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            from omnilauncher.config.settings import DEFAULT_SETTINGS, SettingsManager
+            self.settings._data = SettingsManager._deep_copy(DEFAULT_SETTINGS)
+            self.settings.save()
+            QMessageBox.information(self, "Reset", "Settings reset. Restart launcher.")
+            self._initial_load()
+
+    def _delete_all_data(self):
+        reply = QMessageBox.warning(self, "Warning", "Delete ALL Minecraft data? This will remove worlds!",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                import shutil
+                shutil.rmtree(self.settings.minecraft_dir)
+                QMessageBox.information(self, "Deleted", f"Deleted {self.settings.minecraft_dir}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed: {e}")
+
+    def _toggle_view_mode(self):
+        cur = self.view_mode_btn.text().lower()
+        new = "list" if cur == "grid" else "grid"
+        self.view_mode_btn.setText(new.capitalize())
+        self.settings.set(new, "instances", "view_mode")
+        self.settings.save()
+        self._refresh_instances()
 
     def _open_text_file(self, title: str, filename: str):
         try:
-            from pathlib import Path
-
-            root = Path(__file__).resolve().parents[3]
-            fp = root / filename
+            fp = Path(__file__).resolve().parents[3] / filename
             if not fp.exists():
                 fp = Path.cwd() / filename
-            content = fp.read_text(encoding="utf-8") if fp.exists() else f"{filename} not found at {fp}"
+            content = fp.read_text(encoding="utf-8") if fp.exists() else f"{filename} not found"
         except Exception as e:
             content = f"Failed to open {filename}: {e}"
 
-        top = tk.Toplevel(self.root)
-        top.title(title)
-        top.geometry("600x500")
-        top.configure(bg=self.theme["bg"])
-        txt = tk.Text(top, wrap="word", bg=self.theme["input_bg"], fg=self.theme["text_primary"], font=("Segoe UI", 10))
-        txt.pack(fill="both", expand=True, padx=8, pady=8)
-        txt.insert("1.0", content)
-        txt.configure(state="disabled")
+        dlg = QDialog(self)
+        dlg.setWindowTitle(title)
+        dlg.resize(600, 500)
+        layout = QVBoxLayout(dlg)
+        txt = QPlainTextEdit()
+        txt.setReadOnly(True)
+        txt.setFont(QFont("Segoe UI", 10))
+        txt.setPlainText(content)
+        layout.addWidget(txt)
+        dlg.exec()
 
     def _refresh_all(self):
         self._reload_versions()
@@ -2261,25 +2647,43 @@ class OmniLauncherApp:
         self._refresh_instances()
         self._refresh_play_page()
         self._refresh_java_list()
-        self.status_var.set("Refreshed")
+        self.status_label.setText("Refreshed")
 
-    def _on_closing(self):
+    def closeEvent(self, event):
         try:
-            geom = self.root.geometry()
+            geom = f"{self.width()}x{self.height()}"
             self.settings.set(geom, "meta", "window_geometry")
             self.settings.set(False, "meta", "first_run")
             self.settings.save()
         except Exception:
             pass
-        self.root.destroy()
-
-    def run(self):
-        self.root.mainloop()
+        event.accept()
 
 
 def main():
-    app = OmniLauncherApp()
-    app.run()
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+
+    # Set default palette for proper dark theme
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#1a1d27"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#e6e8f0"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#1f2333"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#242836"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#242836"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#e6e8f0"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#e6e8f0"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#242836"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#e6e8f0"))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Link, QColor("#e94560"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#e94560"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    app.setPalette(palette)
+
+    window = OmniLauncherApp()
+    window.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

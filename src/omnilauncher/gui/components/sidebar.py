@@ -1,138 +1,134 @@
-"""Sidebar component - modern inspired."""
+"""Sidebar component - PySide6 modern design."""
 
-import tkinter as tk
-from typing import Callable, Dict, List, Tuple
+from __future__ import annotations
 
-from omnilauncher.gui.themes import get_theme
+from PySide6.QtWidgets import (
+    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QWidget, QSizePolicy,
+)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QPainter, QColor, QPen
+
+from typing import Dict, List, Tuple
 
 
-class SidebarButton(tk.Frame):
-    def __init__(
-        self,
-        parent,
-        key: str,
-        icon: str,
-        label: str,
-        theme: Dict[str, str],
-        command: Callable[[str], None],
-        badge: str = "",
-    ):
-        super().__init__(parent, bg=theme["sidebar_bg"])
+class SidebarButton(QPushButton):
+    """A single sidebar nav button."""
+
+    def __init__(self, key: str, icon: str, label: str, theme: Dict[str, str], parent=None):
+        super().__init__(f"  {icon}   {label}", parent)
         self.key = key
         self.theme = theme
-        self.command = command
-        self.active = False
-        self.badge = badge
+        self._active = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(42)
+        self.setFont(QFont("Segoe UI", 10))
+        self._apply_style()
 
-        self.button = tk.Button(
-            self,
-            text=f" {icon}   {label}",
-            anchor="w",
-            font=("Segoe UI", 10),
-            fg=theme["text_secondary"],
-            bg=theme["sidebar_bg"],
-            activebackground=theme["sidebar_hover"],
-            activeforeground=theme["text_primary"],
-            bd=0,
-            relief="flat",
-            padx=16,
-            pady=10,
-            command=lambda: self.command(self.key),
-        )
-        self.button.pack(fill="x", padx=6, pady=2)
-
-        self.button.bind("<Enter>", self._on_enter)
-        self.button.bind("<Leave>", self._on_leave)
-
-        if badge:
-            self.badge_label = tk.Label(
-                self.button,
-                text=badge,
-                font=("Segoe UI", 7, "bold"),
-                bg=self.button["bg"],
-                fg=theme["accent"],
-            )
-            # place later via place - keep simple
-
-    def _on_enter(self, e):
-        if not self.active:
-            self.button.configure(bg=self.theme["sidebar_hover"], fg=self.theme["text_primary"])
-
-    def _on_leave(self, e):
-        if not self.active:
-            self.button.configure(bg=self.theme["sidebar_bg"], fg=self.theme["text_secondary"])
+    def _apply_style(self):
+        t = self.theme
+        if self._active:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {t['sidebar_active']};
+                    color: {t['text_primary']};
+                    border: none;
+                    border-radius: 8px;
+                    text-align: left;
+                    padding-left: 16px;
+                    font-weight: bold;
+                    border-left: 3px solid {t['accent']};
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {t['text_secondary']};
+                    border: none;
+                    border-radius: 8px;
+                    text-align: left;
+                    padding-left: 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: {t['sidebar_hover']};
+                    color: {t['text_primary']};
+                }}
+            """)
 
     def set_active(self, active: bool):
-        self.active = active
-        if active:
-            self.button.configure(
-                bg=self.theme["sidebar_active"],
-                fg=self.theme["text_primary"],
-                font=("Segoe UI", 10, "bold"),
-            )
-            # add accent left border effect via bg?
-        else:
-            self.button.configure(
-                bg=self.theme["sidebar_bg"],
-                fg=self.theme["text_secondary"],
-                font=("Segoe UI", 10),
-            )
+        self._active = active
+        self._apply_style()
 
     def update_theme(self, theme: Dict[str, str]):
         self.theme = theme
-        self.configure(bg=theme["sidebar_bg"])
-        if self.active:
-            self.button.configure(bg=theme["sidebar_active"], fg=theme["text_primary"])
-        else:
-            self.button.configure(bg=theme["sidebar_bg"], fg=theme["text_secondary"])
+        self._apply_style()
 
 
-class Sidebar(tk.Frame):
-    def __init__(self, parent, theme: Dict[str, str], on_select: Callable[[str], None]):
-        super().__init__(parent, bg=theme["sidebar_bg"], width=240)
+class Sidebar(QFrame):
+    """Main sidebar with navigation, logo, and user preview."""
+
+    page_selected = Signal(str)
+
+    def __init__(self, theme: Dict[str, str], parent=None):
+        super().__init__(parent)
         self.theme = theme
-        self.on_select = on_select
+        self.setFixedWidth(240)
+        self.setObjectName("sidebar")
+
         self.buttons: Dict[str, SidebarButton] = {}
-        self.pack_propagate(False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 16, 12, 12)
+        layout.setSpacing(0)
 
         # Logo area
-        logo_frame = tk.Frame(self, bg=theme["sidebar_bg"], height=80)
-        logo_frame.pack(fill="x", pady=(16, 8))
-        logo_frame.pack_propagate(False)
+        logo_frame = QFrame()
+        logo_frame.setFixedHeight(72)
+        logo_layout = QHBoxLayout(logo_frame)
+        logo_layout.setContentsMargins(8, 0, 8, 0)
 
-        # Icon O like brand
-        icon_canvas = tk.Canvas(logo_frame, width=48, height=48, bg=theme["sidebar_bg"], highlightthickness=0)
-        icon_canvas.pack(side="left", padx=16)
-        # draw hexagon O
-        icon_canvas.create_oval(6, 6, 42, 42, fill=theme["card_bg"], outline=theme["accent"], width=2)
-        icon_canvas.create_text(24, 26, text="O", font=("Segoe UI", 18, "bold"), fill=theme["accent"])
+        # Logo icon label
+        self._logo_icon = QLabel("O")
+        self._logo_icon.setFixedSize(44, 44)
+        self._logo_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._logo_icon.setStyleSheet(f"""
+            QLabel {{
+                background-color: {theme['card_bg']};
+                color: {theme['accent']};
+                border: 2px solid {theme['accent']};
+                border-radius: 22px;
+                font-size: 20px;
+                font-weight: bold;
+            }}
+        """)
+        logo_layout.addWidget(self._logo_icon)
 
-        text_frame = tk.Frame(logo_frame, bg=theme["sidebar_bg"])
-        text_frame.pack(side="left", fill="y")
-        tk.Label(
-            text_frame,
-            text="OmniLauncher",
-            font=("Segoe UI", 12, "bold"),
-            bg=theme["sidebar_bg"],
-            fg=theme["text_primary"],
-        ).pack(anchor="w")
-        tk.Label(
-            text_frame,
-            text="MC  •  v0.2.0",
-            font=("Segoe UI", 8),
-            bg=theme["sidebar_bg"],
-            fg=theme["text_muted"],
-        ).pack(anchor="w")
+        logo_text = QVBoxLayout()
+        logo_text.setSpacing(0)
+        title = QLabel("OmniLauncher")
+        title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {theme['text_primary']}; background: transparent;")
+        subtitle = QLabel("MC  •  v0.2.0")
+        subtitle.setFont(QFont("Segoe UI", 8))
+        subtitle.setStyleSheet(f"color: {theme['text_muted']}; background: transparent;")
+        logo_text.addWidget(title)
+        logo_text.addWidget(subtitle)
+        logo_layout.addLayout(logo_text)
 
-        # separator
-        sep = tk.Frame(self, bg=theme["separator"], height=1)
-        sep.pack(fill="x", padx=16, pady=8)
+        layout.addWidget(logo_frame)
 
-        # nav - modern style with many sections
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {theme['separator']};")
+        layout.addWidget(sep)
+        layout.addSpacing(8)
+
+        # Navigation items
         nav_items: List[Tuple[str, str, str]] = [
             ("play", "▶", "Play"),
             ("instances", "◫", "Instances"),
-            ("accounts", "◍", "Accounts"),
+            ("accounts", "👤", "Accounts"),
             ("mods", "⬢", "Mods"),
             ("explorer", "📁", "File Explorer"),
             ("servers", "🌐", "Servers"),
@@ -143,106 +139,107 @@ class Sidebar(tk.Frame):
             ("about", "ℹ", "About"),
         ]
 
-        nav_frame = tk.Frame(self, bg=theme["sidebar_bg"])
-        nav_frame.pack(fill="x", padx=0, pady=4)
-
         for key, icon, label in nav_items:
-            btn = SidebarButton(nav_frame, key, icon, label, theme, self._clicked)
-            btn.pack(fill="x")
+            btn = SidebarButton(key, icon, label, theme)
+            btn.clicked.connect(lambda checked, k=key: self._on_click(k))
+            layout.addWidget(btn)
             self.buttons[key] = btn
 
-        # spacer
-        spacer = tk.Frame(self, bg=theme["sidebar_bg"])
-        spacer.pack(fill="both", expand=True)
+        # Spacer
+        layout.addStretch()
 
-        # bottom user preview
-        self.user_frame = tk.Frame(self, bg=theme["card_bg"], height=72)
-        self.user_frame.pack(fill="x", padx=12, pady=12)
-        self.user_frame.pack_propagate(False)
+        # User preview card
+        self.user_frame = QFrame()
+        self.user_frame.setFixedHeight(64)
+        self.user_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {theme['card_bg']};
+                border-radius: 10px;
+            }}
+        """)
+        user_layout = QHBoxLayout(self.user_frame)
+        user_layout.setContentsMargins(12, 8, 12, 8)
 
-        self._build_user_preview()
+        # Avatar
+        self._avatar = QLabel("S")
+        self._avatar.setFixedSize(36, 36)
+        self._avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._avatar.setStyleSheet(f"""
+            QLabel {{
+                background-color: {theme['accent']};
+                color: white;
+                border-radius: 18px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+        """)
+        user_layout.addWidget(self._avatar)
 
-        # footer actions
-        bottom_actions = tk.Frame(self, bg=theme["sidebar_bg"])
-        bottom_actions.pack(fill="x", padx=12, pady=(0, 12))
+        user_text = QVBoxLayout()
+        user_text.setSpacing(2)
+        self.user_name_label = QLabel("Steve")
+        self.user_name_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        self.user_name_label.setStyleSheet(f"color: {theme['text_primary']}; background: transparent;")
+        self.user_status_label = QLabel("Offline • Ready")
+        self.user_status_label.setFont(QFont("Segoe UI", 8))
+        self.user_status_label.setStyleSheet(f"color: {theme['text_muted']}; background: transparent;")
+        user_text.addWidget(self.user_name_label)
+        user_text.addWidget(self.user_status_label)
+        user_layout.addLayout(user_text)
 
-        tk.Button(
-            bottom_actions,
-            text="📁  Open Folder",
-            anchor="w",
-            font=("Segoe UI", 9),
-            bg=theme["sidebar_bg"],
-            fg=theme["text_muted"],
-            activebackground=theme["sidebar_hover"],
-            bd=0,
-            command=lambda: self.on_select("open_folder"),
-        ).pack(side="left")
-        tk.Button(
-            bottom_actions,
-            text="⤓",
-            font=("Segoe UI", 9),
-            bg=theme["sidebar_bg"],
-            fg=theme["text_muted"],
-            bd=0,
-        ).pack(side="right")
+        layout.addWidget(self.user_frame)
+        layout.addSpacing(8)
 
-    def _build_user_preview(self):
-        # clear
-        for w in self.user_frame.winfo_children():
-            w.destroy()
-        theme = self.theme
-        # avatar canvas
-        av = tk.Canvas(self.user_frame, width=36, height=36, bg=theme["card_bg"], highlightthickness=0)
-        av.pack(side="left", padx=12, pady=12)
-        av.create_rectangle(0, 0, 36, 36, fill=theme["accent"], outline="")
-        av.create_text(18, 20, text="S", font=("Segoe UI", 14, "bold"), fill="white")
+        # Bottom action
+        bottom = QFrame()
+        bottom_layout = QHBoxLayout(bottom)
+        bottom_layout.setContentsMargins(4, 0, 4, 0)
+        open_btn = QPushButton("📁  Open Folder")
+        open_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {theme['text_muted']};
+                border: none;
+                text-align: left;
+                padding: 4px 8px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                color: {theme['text_primary']};
+            }}
+        """)
+        open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_btn.clicked.connect(lambda: self.page_selected.emit("open_folder"))
+        bottom_layout.addWidget(open_btn)
+        layout.addWidget(bottom)
 
-        txt = tk.Frame(self.user_frame, bg=theme["card_bg"])
-        txt.pack(side="left", fill="y", pady=8)
+        self._apply_bg()
 
-        self.user_name_label = tk.Label(
-            txt,
-            text="Steve",
-            font=("Segoe UI", 10, "bold"),
-            bg=theme["card_bg"],
-            fg=theme["text_primary"],
-            anchor="w",
-        )
-        self.user_name_label.pack(anchor="w")
-        self.user_status_label = tk.Label(
-            txt,
-            text="Offline • Ready",
-            font=("Segoe UI", 8),
-            bg=theme["card_bg"],
-            fg=theme["text_muted"],
-            anchor="w",
-        )
-        self.user_status_label.pack(anchor="w")
+    def _apply_bg(self):
+        t = self.theme
+        self.setStyleSheet(f"""
+            QFrame#sidebar {{
+                background-color: {t['sidebar_bg']};
+                border-right: 1px solid {t['separator']};
+            }}
+        """)
 
-    def _clicked(self, key: str):
-        if key == "open_folder":
-            self.on_select(key)
-            return
+    def _on_click(self, key: str):
         self.set_active(key)
-        self.on_select(key)
+        self.page_selected.emit(key)
 
     def set_active(self, key: str):
         for k, btn in self.buttons.items():
             btn.set_active(k == key)
 
     def update_user(self, username: str, status: str = "Offline • Ready"):
-        self.user_name_label.configure(text=username)
-        self.user_status_label.configure(text=status)
+        self.user_name_label.setText(username)
+        self.user_status_label.setText(status)
+        if username:
+            self._avatar.setText(username[0].upper())
 
     def update_theme(self, theme: Dict[str, str]):
         self.theme = theme
-        self.configure(bg=theme["sidebar_bg"])
-        for child in self.winfo_children():
-            try:
-                child.configure(bg=theme["sidebar_bg"])
-            except Exception:
-                pass
-        self.user_frame.configure(bg=theme["card_bg"])
+        self._apply_bg()
         for btn in self.buttons.values():
             btn.update_theme(theme)
-        self._build_user_preview()

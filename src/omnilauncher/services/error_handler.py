@@ -1,19 +1,9 @@
-"""Error handling service module."""
+"""Error handling service module - PySide6 compatible."""
 
 import traceback
 import datetime
 import uuid
 import sys
-
-try:
-    from tkinter.messagebox import showerror
-
-    HAS_TK = True
-except Exception:
-    HAS_TK = False
-
-    def showerror(title, message):
-        print(f"[{title}] {message}", file=sys.stderr)
 
 
 def handle_error(exception: Exception, log_path: str = "launcher.log") -> uuid.UUID:
@@ -50,10 +40,15 @@ Details:
         pass
 
     try:
-        showerror(
-            "Error",
-            f"An error occurred.\nError ID: {error_id}\nPlease report this on Github.",
-        )
+        from PySide6.QtWidgets import QMessageBox, QApplication
+        if QApplication.instance():
+            QMessageBox.critical(
+                None,
+                "Error",
+                f"An error occurred.\nError ID: {error_id}\nPlease report this on Github.",
+            )
+        else:
+            print(f"Error {error_id}: {exception}", file=sys.stderr)
     except Exception:
         print(f"Error {error_id}: {exception}", file=sys.stderr)
 

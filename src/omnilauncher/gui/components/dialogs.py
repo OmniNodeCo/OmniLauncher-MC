@@ -1,173 +1,376 @@
-"""Dialogs and popups."""
+"""Dialogs and popups - PySide6."""
 
-import tkinter as tk
-from tkinter import ttk
-from typing import Dict, Callable
+from __future__ import annotations
+
+from typing import Callable, Dict, List
+
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QTextEdit, QFrame, QFileDialog, QListWidget, QListWidgetItem,
+    QSizePolicy,
+)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 
-class CrashReportDialog(tk.Toplevel):
-    def __init__(self, parent, theme: Dict[str, str], log_text: str, findings: list):
+class CrashReportDialog(QDialog):
+    """Shows crash analysis results."""
+
+    def __init__(self, theme: Dict[str, str], log_text: str, findings: list, parent=None):
         super().__init__(parent)
-        self.title("Crash Report • OmniLauncher")
-        self.configure(bg=theme["bg"])
-        self.geometry("640x520")
-        self.transient(parent)
-        self.grab_set()
+        self.setWindowTitle("Crash Report • OmniLauncher")
+        self.setMinimumSize(640, 520)
+        self._log = log_text
+        self._findings = findings
+        t = theme
 
-        tk.Label(self, text="💥  Minecraft Crashed", font=("Segoe UI", 14, "bold"), bg=theme["bg"], fg=theme["error"]).pack(anchor="w", padx=20, pady=(16, 4))
-        tk.Label(self, text="Launcher analyzed the log and tried to explain what went wrong:", font=("Segoe UI", 9), bg=theme["bg"], fg=theme["text_secondary"]).pack(anchor="w", padx=20)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
 
-        # findings
-        findings_frame = tk.Frame(self, bg=theme["card_bg"], highlightthickness=1, highlightbackground=theme["card_border"])
-        findings_frame.pack(fill="x", padx=16, pady=12)
+        # Title
+        title = QLabel("💥  Minecraft Crashed")
+        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {t['error']};")
+        layout.addWidget(title)
+
+        sub = QLabel("Launcher analyzed the log and tried to explain what went wrong:")
+        sub.setFont(QFont("Segoe UI", 9))
+        sub.setStyleSheet(f"color: {t['text_secondary']};")
+        layout.addWidget(sub)
+
+        # Findings
+        findings_frame = QFrame()
+        findings_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t['card_bg']};
+                border: 1px solid {t['card_border']};
+                border-radius: 8px;
+            }}
+        """)
+        findings_layout = QVBoxLayout(findings_frame)
+        findings_layout.setContentsMargins(12, 12, 12, 12)
+        findings_layout.setSpacing(8)
 
         if not findings:
-            tk.Label(findings_frame, text="No specific cause found. Please check full log.", bg=theme["card_bg"], fg=theme["text_secondary"]).pack(padx=12, pady=12)
+            lbl = QLabel("No specific cause found. Please check full log.")
+            lbl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+            findings_layout.addWidget(lbl)
         else:
             for f in findings:
                 sev = f.get("severity", "error")
-                color = theme["error"] if sev in ("error", "critical") else theme["warning"] if sev == "warn" else theme["text_primary"]
-                row = tk.Frame(findings_frame, bg=theme["card_bg"])
-                row.pack(fill="x", padx=12, pady=6)
-                tk.Label(row, text=f"[{sev.upper()}] {f['title']}", font=("Segoe UI", 10, "bold"), bg=theme["card_bg"], fg=color, anchor="w").pack(anchor="w")
-                tk.Label(row, text=f["description"], font=("Segoe UI", 9), bg=theme["card_bg"], fg=theme["text_secondary"], wraplength=560, justify="left").pack(anchor="w", pady=2)
-                tk.Label(row, text=f"Fix: {f['fix']}", font=("Segoe UI", 9, "bold"), bg=theme["card_bg"], fg=theme["text_primary"], wraplength=560, justify="left").pack(anchor="w")
+                color = t['error'] if sev in ("error", "critical") else t['warning'] if sev == "warn" else t['text_primary']
+                row = QVBoxLayout()
+                row.setSpacing(4)
 
-        # log preview
-        tk.Label(self, text="Log Snippet", font=("Segoe UI", 10, "bold"), bg=theme["bg"], fg=theme["text_primary"]).pack(anchor="w", padx=20, pady=(8, 4))
-        txt = tk.Text(self, bg=theme["input_bg"], fg=theme["text_secondary"], height=12, font=("Consolas", 9), wrap="word", bd=0)
-        txt.pack(fill="both", expand=True, padx=16, pady=4)
-        txt.insert("1.0", log_text[-4000:] if len(log_text) > 4000 else log_text)
-        txt.configure(state="disabled")
+                title_lbl = QLabel(f"[{sev.upper()}] {f['title']}")
+                title_lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+                title_lbl.setStyleSheet(f"color: {color}; background: transparent;")
+                row.addWidget(title_lbl)
 
-        btns = tk.Frame(self, bg=theme["bg"])
-        btns.pack(fill="x", padx=16, pady=12)
-        tk.Button(btns, text="Copy Report", bg=theme["card_bg"], fg=theme["text_primary"], bd=0, command=self._copy).pack(side="left")
-        tk.Button(btns, text="Close", bg=theme["accent"], fg="white", bd=0, padx=20, command=self.destroy).pack(side="right")
+                desc_lbl = QLabel(f["description"])
+                desc_lbl.setFont(QFont("Segoe UI", 9))
+                desc_lbl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+                desc_lbl.setWordWrap(True)
+                row.addWidget(desc_lbl)
 
-        self._log = log_text
-        self._findings = findings
+                fix_lbl = QLabel(f"Fix: {f['fix']}")
+                fix_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                fix_lbl.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+                fix_lbl.setWordWrap(True)
+                row.addWidget(fix_lbl)
+
+                findings_layout.addLayout(row)
+
+        layout.addWidget(findings_frame)
+
+        # Log snippet
+        log_title = QLabel("Log Snippet")
+        log_title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        log_title.setStyleSheet(f"color: {t['text_primary']};")
+        layout.addWidget(log_title)
+
+        log_text_edit = QTextEdit()
+        log_text_edit.setReadOnly(True)
+        log_text_edit.setFont(QFont("Consolas", 9))
+        log_text_edit.setPlainText(log_text[-4000:] if len(log_text) > 4000 else log_text)
+        log_text_edit.setMaximumHeight(200)
+        layout.addWidget(log_text_edit)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        copy_btn = QPushButton("Copy Report")
+        copy_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['card_bg']};
+                color: {t['text_primary']};
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{ background-color: {t['card_hover']}; }}
+        """)
+        copy_btn.clicked.connect(self._copy)
+        btn_layout.addWidget(copy_btn)
+
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['accent']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: {t['accent_hover']}; }}
+        """)
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
 
     def _copy(self):
-        self.clipboard_clear()
-        report = "\n".join([f"{f['title']}: {f['description']} Fix: {f['fix']}" for f in self._findings]) + "\n\nLog:\n" + self._log[-2000:]
-        self.clipboard_append(report)
+        report = "\n".join(
+            [f"{f['title']}: {f['description']} Fix: {f['fix']}" for f in self._findings]
+        ) + "\n\nLog:\n" + self._log[-2000:]
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(report)
 
 
-class ConfirmDialog(tk.Toplevel):
-    def __init__(self, parent, theme, title, message, on_confirm: Callable, danger=False):
+class ConfirmDialog(QDialog):
+    """Simple confirm/cancel dialog."""
+
+    def __init__(self, theme: Dict[str, str], title: str, message: str,
+                 on_confirm: Callable, danger: bool = False, parent=None):
         super().__init__(parent)
-        self.title(title)
-        self.configure(bg=theme["bg"])
-        self.geometry("420x180")
-        self.transient(parent)
-        self.grab_set()
-        tk.Label(self, text=title, font=("Segoe UI", 12, "bold"), bg=theme["bg"], fg=theme["error"] if danger else theme["text_primary"]).pack(pady=(20, 6))
-        tk.Label(self, text=message, font=("Segoe UI", 9), bg=theme["bg"], fg=theme["text_secondary"], wraplength=380, justify="left").pack(padx=20, pady=4)
-        btns = tk.Frame(self, bg=theme["bg"])
-        btns.pack(side="bottom", fill="x", padx=20, pady=16)
-        tk.Button(btns, text="Cancel", bg=theme["card_bg"], fg=theme["text_secondary"], bd=0, padx=16, command=self.destroy).pack(side="right", padx=4)
-        tk.Button(btns, text="Confirm", bg=theme["error"] if danger else theme["accent"], fg="white", bd=0, padx=16, command=lambda: (on_confirm(), self.destroy())).pack(side="right", padx=4)
+        self.setWindowTitle(title)
+        self.setFixedSize(420, 180)
+        self._on_confirm = on_confirm
+        t = theme
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(8)
+
+        ttl = QLabel(title)
+        ttl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        ttl.setStyleSheet(f"color: {t['error'] if danger else t['text_primary']};")
+        layout.addWidget(ttl)
+
+        msg = QLabel(message)
+        msg.setFont(QFont("Segoe UI", 9))
+        msg.setStyleSheet(f"color: {t['text_secondary']};")
+        msg.setWordWrap(True)
+        layout.addWidget(msg)
+
+        layout.addStretch()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['card_bg']};
+                color: {t['text_secondary']};
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{ background-color: {t['card_hover']}; }}
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        confirm_btn = QPushButton("Confirm")
+        confirm_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['error'] if danger else t['accent']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {'#e0354f' if danger else t['accent_hover']};
+            }}
+        """)
+        confirm_btn.clicked.connect(self._do_confirm)
+        btn_layout.addWidget(confirm_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _do_confirm(self):
+        self._on_confirm()
+        self.accept()
 
 
-class FileExplorerDialog(tk.Toplevel):
-    def __init__(self, parent, theme, mc_dir, on_select=None):
+class FileExplorerDialog(QDialog):
+    """Built-in file explorer dialog."""
+
+    def __init__(self, theme: Dict[str, str], mc_dir: str, parent=None):
         super().__init__(parent)
-        self.title(f"File Explorer • {mc_dir}")
-        self.configure(bg=theme["bg"])
-        self.geometry("780x520")
-        self.transient(parent)
-
-        from omnilauncher.services.file_explorer import list_files, get_bookmarks
-
+        self.setWindowTitle(f"File Explorer • {mc_dir}")
+        self.setMinimumSize(780, 520)
         self.mc_dir = mc_dir
         self.current_path = mc_dir
-        self.on_select = on_select
         self.theme = theme
+        t = theme
 
-        left = tk.Frame(self, bg=theme["sidebar_bg"], width=180)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
-        tk.Label(left, text="Bookmarks", font=("Segoe UI", 10, "bold"), bg=theme["sidebar_bg"], fg=theme["text_primary"]).pack(anchor="w", padx=12, pady=(12, 6))
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        self.bm_frame = tk.Frame(left, bg=theme["sidebar_bg"])
-        self.bm_frame.pack(fill="x")
+        # Left bookmarks
+        left = QFrame()
+        left.setFixedWidth(180)
+        left.setStyleSheet(f"background-color: {t['sidebar_bg']};")
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(12, 12, 12, 12)
 
-        def open_bm(path):
-            self.current_path = path
-            self._refresh()
+        bm_title = QLabel("Bookmarks")
+        bm_title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        bm_title.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+        left_layout.addWidget(bm_title)
 
+        from omnilauncher.services.file_explorer import get_bookmarks
         for bm in get_bookmarks(mc_dir):
-            b = tk.Button(self.bm_frame, text=f"{bm['icon']}  {bm['name']}", anchor="w", bg=theme["sidebar_bg"], fg=theme["text_secondary"] if bm["exists"] else theme["text_muted"], bd=0, font=("Segoe UI", 9), command=lambda p=bm["path"]: open_bm(p))
-            b.pack(fill="x", padx=6, pady=2)
+            btn = QPushButton(f"{bm['icon']}  {bm['name']}")
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {t['text_secondary'] if bm['exists'] else t['text_muted']};
+                    border: none;
+                    text-align: left;
+                    padding: 6px 8px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                }}
+                QPushButton:hover {{
+                    background-color: {t['sidebar_hover']};
+                    color: {t['text_primary']};
+                }}
+            """)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, p=bm['path']: self._navigate(p))
+            left_layout.addWidget(btn)
 
-        right = tk.Frame(self, bg=theme["bg"])
-        right.pack(side="right", fill="both", expand=True)
+        left_layout.addStretch()
+        layout.addWidget(left)
 
-        toolbar = tk.Frame(right, bg=theme["header_bg"], height=40)
-        toolbar.pack(fill="x")
-        toolbar.pack_propagate(False)
-        self.path_label = tk.Label(toolbar, text=mc_dir, font=("Segoe UI", 9), bg=theme["header_bg"], fg=theme["text_secondary"])
-        self.path_label.pack(side="left", padx=12)
-        tk.Button(toolbar, text="↑ Up", bg=theme["card_bg"], fg=theme["text_secondary"], bd=0, font=("Segoe UI", 8), command=self._go_up).pack(side="right", padx=8, pady=6)
+        # Right content
+        right = QFrame()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(12, 12, 12, 12)
+        right_layout.setSpacing(8)
 
-        self.listbox = tk.Listbox(right, bg=theme["input_bg"], fg=theme["text_primary"], bd=0, font=("Segoe UI", 10), selectbackground=theme["sidebar_active"])
-        self.listbox.pack(fill="both", expand=True, padx=12, pady=8)
-        self.listbox.bind("<Double-Button-1>", lambda e: self._open_selected())
+        # Toolbar
+        toolbar = QFrame()
+        toolbar.setFixedHeight(40)
+        toolbar.setStyleSheet(f"background-color: {t['header_bg']}; border-radius: 6px;")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(12, 0, 12, 0)
 
-        btns = tk.Frame(right, bg=theme["bg"])
-        btns.pack(fill="x", padx=12, pady=8)
-        tk.Button(btns, text="Open Folder", bg=theme["card_bg"], fg=theme["text_secondary"], bd=0, command=lambda: __import__("webbrowser").open(self.current_path) if False else self._open_os()).pack(side="left")
-        tk.Button(btns, text="Close", bg=theme["accent"], fg="white", bd=0, command=self.destroy).pack(side="right")
+        self.path_label = QLabel(mc_dir)
+        self.path_label.setFont(QFont("Segoe UI", 9))
+        self.path_label.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+        toolbar_layout.addWidget(self.path_label, 1)
 
+        up_btn = QPushButton("↑ Up")
+        up_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['card_bg']};
+                color: {t['text_secondary']};
+                border: none;
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{ color: {t['text_primary']}; }}
+        """)
+        up_btn.clicked.connect(self._go_up)
+        toolbar_layout.addWidget(up_btn)
+
+        open_btn = QPushButton("Open in OS")
+        open_btn.setStyleSheet(up_btn.styleSheet())
+        open_btn.clicked.connect(self._open_os)
+        toolbar_layout.addWidget(open_btn)
+
+        right_layout.addWidget(toolbar)
+
+        # File list
+        self.file_list = QListWidget()
+        self.file_list.setFont(QFont("Segoe UI", 10))
+        self.file_list.itemDoubleClicked.connect(self._on_double_click)
+        right_layout.addWidget(self.file_list, 1)
+
+        # Bottom buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['accent']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: {t['accent_hover']}; }}
+        """)
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+        right_layout.addLayout(btn_layout)
+
+        layout.addWidget(right, 1)
+
+        self._items = []
+        self._refresh()
+
+    def _navigate(self, path: str):
+        self.current_path = path
         self._refresh()
 
     def _refresh(self):
         from omnilauncher.services.file_explorer import list_files
-
-        self.path_label.configure(text=self.current_path)
-        self.listbox.delete(0, "end")
-        items = list_files(self.current_path)
-        self._items = items
-        for it in items:
+        self.path_label.setText(self.current_path)
+        self.file_list.clear()
+        self._items = list_files(self.current_path)
+        for it in self._items:
             prefix = "📁" if it["is_dir"] else "📄"
-            self.listbox.insert("end", f"{prefix}  {it['name']}  ({it['size']} bytes)" if not it["is_dir"] else f"{prefix}  {it['name']}/")
+            text = f"{prefix}  {it['name']}/" if it["is_dir"] else f"{prefix}  {it['name']}  ({it['size']} bytes)"
+            self.file_list.addItem(text)
 
-    def _open_selected(self):
-        sel = self.listbox.curselection()
-        if not sel:
-            return
-        idx = sel[0]
-        it = self._items[idx]
-        if it["is_dir"]:
-            self.current_path = it["path"]
-            self._refresh()
-        else:
-            if self.on_select:
-                self.on_select(it["path"])
+    def _on_double_click(self, item: QListWidgetItem):
+        idx = self.file_list.row(item)
+        if 0 <= idx < len(self._items):
+            it = self._items[idx]
+            if it["is_dir"]:
+                self.current_path = it["path"]
+                self._refresh()
 
     def _go_up(self):
-        import os
         from pathlib import Path
-
         parent = str(Path(self.current_path).parent)
-        if parent and len(parent) >= len(self.mc_dir) - 10:  # prevent going too far but allow
+        if parent and len(parent) >= len(self.mc_dir) - 10:
             self.current_path = parent
-            self._refresh()
         else:
             self.current_path = self.mc_dir
-            self._refresh()
+        self._refresh()
 
     def _open_os(self):
+        import os, platform, subprocess
         try:
-            import os, platform, subprocess
-
-            p = self.current_path
             if platform.system() == "Windows":
-                os.startfile(p)
+                os.startfile(self.current_path)
             elif platform.system() == "Darwin":
-                subprocess.Popen(["open", p])
+                subprocess.Popen(["open", self.current_path])
             else:
-                subprocess.Popen(["xdg-open", p])
+                subprocess.Popen(["xdg-open", self.current_path])
         except Exception:
             pass

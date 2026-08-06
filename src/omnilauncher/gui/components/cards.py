@@ -1,8 +1,15 @@
-"""Reusable cards - Instances, Accounts, Settings rows."""
+"""Reusable card widgets - PySide6 Instance/Account cards."""
 
-import tkinter as tk
-from typing import Dict, Callable
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Callable, Dict
+
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QWidget, QSizePolicy, QMenu,
+)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QColor, QPainter, QPen, QAction
 
 
 ICON_COLORS = {
@@ -16,7 +23,7 @@ ICON_COLORS = {
     "tnt": "#ff3b30",
     "chest": "#d3a56a",
     "book": "#c0392b",
-    "anvil": "#444",
+    "anvil": "#444444",
     "beacon": "#7dd6ff",
     "bricks": "#b04a3a",
     "dirt": "#866043",
@@ -34,87 +41,70 @@ def _icon_color(name: str) -> str:
     return ICON_COLORS.get(name, "#e94560")
 
 
-class InstanceCard(tk.Frame):
-    def __init__(
-        self,
-        parent,
-        instance: Dict,
-        theme: Dict[str, str],
-        on_play: Callable[[str], None],
-        on_select: Callable[[str], None],
-        on_context: Callable[[str, int, int], None] | None = None,
-    ):
-        super().__init__(parent, bg=theme["card_bg"], bd=0, highlightthickness=1, highlightbackground=theme["card_border"])
+class InstanceCard(QFrame):
+    """An instance card with icon, details, and play button."""
+
+    play_clicked = Signal(str)
+    select_clicked = Signal(str)
+    context_menu = Signal(str, object)  # inst_id, QPoint
+
+    def __init__(self, instance: Dict, theme: Dict[str, str], parent=None):
+        super().__init__(parent)
         self.instance = instance
         self.theme = theme
-        self.on_play = on_play
-        self.on_select = on_select
-        self.on_context = on_context
+        self.setObjectName("instanceCard")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context)
         self._build()
+        self._apply_style(False)
 
     def _build(self):
-        th = self.theme
+        t = self.theme
         inst = self.instance
 
-        # hover
-        self.bind("<Enter>", lambda e: self.configure(bg=th["card_hover"]))
-        self.bind("<Leave>", lambda e: self.configure(bg=th["card_bg"]))
+        self.setFixedHeight(90)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(12)
 
-        inner = tk.Frame(self, bg=th["card_bg"])
-        inner.pack(fill="both", expand=True, padx=12, pady=10)
-        inner.bind("<Enter>", lambda e: self._set_inner_bg(th["card_hover"], inner))
-        inner.bind("<Leave>", lambda e: self._set_inner_bg(th["card_bg"], inner))
-        inner.bind("<Button-1>", lambda e: self.on_select(inst["id"]))
-        if self.on_context:
-            inner.bind("<Button-3>", lambda e: self.on_context(inst["id"], e.x_root, e.y_root))
-
-        # icon
-        icon_frame = tk.Frame(inner, bg=th["card_bg"], width=48, height=48)
-        icon_frame.pack(side="left")
-        icon_frame.pack_propagate(False)
-        c = tk.Canvas(icon_frame, width=48, height=48, bg=th["card_bg"], highlightthickness=0)
-        c.pack()
+        # Icon
+        self._icon_label = QLabel(inst.get("name", "?")[:1].upper())
+        self._icon_label.setFixedSize(48, 48)
+        self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         color = _icon_color(inst.get("icon", "grass"))
-        c.create_rectangle(4, 4, 44, 44, fill=color, outline="", width=0)
-        # pixel art hint - darker top
-        c.create_rectangle(4, 4, 44, 14, fill="#ffffff", outline="", stipple="gray25")
-        # letter
-        letter = inst.get("name", "?")[:1].upper()
-        c.create_text(24, 26, text=letter, font=("Segoe UI", 14, "bold"), fill="white")
-        # fav star
-        if inst.get("favorite"):
-            c.create_text(38, 8, text="★", font=("Segoe UI", 10), fill="#ffcc00")
+        fav = inst.get("favorite", False)
+        border = f"border: 2px solid #ffcc00;" if fav else "border: none;"
+        self._icon_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {color};
+                color: white;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: bold;
+                {border}
+            }}
+        """)
+        layout.addWidget(self._icon_label)
 
-        # text
-        txt = tk.Frame(inner, bg=th["card_bg"])
-        txt.pack(side="left", fill="both", expand=True, padx=12)
-        txt.bind("<Button-1>", lambda e: self.on_select(inst["id"]))
+        # Text
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(3)
 
-        name_lbl = tk.Label(
-            txt,
-            text=inst.get("name", "Unnamed"),
-            font=("Segoe UI", 10, "bold"),
-            bg=th["card_bg"],
-            fg=th["text_primary"],
-            anchor="w",
-        )
-        name_lbl.pack(anchor="w", fill="x")
-        name_lbl.bind("<Button-1>", lambda e: self.on_select(inst["id"]))
+        name_lbl = QLabel(inst.get("name", "Unnamed"))
+        name_lbl.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        name_lbl.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+        text_layout.addWidget(name_lbl)
 
         ver = inst.get("version") or "No version"
         loader = inst.get("loader", "vanilla")
-        details = f"{ver} • {loader} • {inst.get('group','Custom')}"
-        detail_lbl = tk.Label(
-            txt,
-            text=details,
-            font=("Segoe UI", 8),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            anchor="w",
-        )
-        detail_lbl.pack(anchor="w")
+        group = inst.get("group", "Custom")
+        detail_lbl = QLabel(f"{ver} • {loader} • {group}")
+        detail_lbl.setFont(QFont("Segoe UI", 9))
+        detail_lbl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+        text_layout.addWidget(detail_lbl)
 
-        # playtime
+        # Playtime meta
         pt = inst.get("playtime_minutes", 0)
         last = inst.get("last_played", "")
         if last:
@@ -125,180 +115,220 @@ class InstanceCard(tk.Frame):
                 last_s = last[:10]
             meta = f"Played {last_s}"
             if pt:
-                meta += f" • {pt//60}h {pt%60}m"
+                meta += f" • {pt // 60}h {pt % 60}m"
         else:
-            meta = "Never played" if not pt else f"{pt//60}h {pt%60}m"
-        meta_lbl = tk.Label(
-            txt,
-            text=meta,
-            font=("Segoe UI", 7),
-            bg=th["card_bg"],
-            fg=th["text_muted"],
-            anchor="w",
-        )
-        meta_lbl.pack(anchor="w")
+            meta = "Never played" if not pt else f"{pt // 60}h {pt % 60}m"
+        meta_lbl = QLabel(meta)
+        meta_lbl.setFont(QFont("Segoe UI", 8))
+        meta_lbl.setStyleSheet(f"color: {t['text_muted']}; background: transparent;")
+        text_layout.addWidget(meta_lbl)
 
-        # play button
-        play_btn = tk.Button(
-            inner,
-            text="▶",
-            font=("Segoe UI", 10, "bold"),
-            bg=th["accent"],
-            fg="white",
-            activebackground=th["accent_hover"],
-            bd=0,
-            padx=12,
-            pady=4,
-            command=lambda: self.on_play(inst["id"]),
-        )
-        play_btn.pack(side="right")
+        layout.addLayout(text_layout, 1)
 
-    def _set_inner_bg(self, bg, frame):
-        try:
-            self.configure(bg=bg)
-            frame.configure(bg=bg)
-            for c in frame.winfo_children():
-                if isinstance(c, tk.Frame):
-                    c.configure(bg=bg)
-                    for cc in c.winfo_children():
-                        if isinstance(cc, (tk.Frame, tk.Label)):
-                            try:
-                                cc.configure(bg=bg)
-                            except Exception:
-                                pass
-                        if isinstance(cc, tk.Canvas):
-                            cc.configure(bg=bg)
-                elif isinstance(c, tk.Label):
-                    c.configure(bg=bg)
-        except Exception:
-            pass
+        # Play button
+        play_btn = QPushButton("▶")
+        play_btn.setFixedSize(40, 36)
+        play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t['accent']};
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {t['accent_hover']};
+            }}
+        """)
+        play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        play_btn.clicked.connect(lambda: self.play_clicked.emit(self.instance["id"]))
+        layout.addWidget(play_btn)
+
+    def _apply_style(self, hovered: bool):
+        t = self.theme
+        bg = t['card_hover'] if hovered else t['card_bg']
+        self.setStyleSheet(f"""
+            QFrame#instanceCard {{
+                background-color: {bg};
+                border: 1px solid {t['card_border']};
+                border-radius: 10px;
+            }}
+        """)
+
+    def enterEvent(self, event):
+        self._apply_style(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._apply_style(False)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.select_clicked.emit(self.instance["id"])
+        super().mousePressEvent(event)
+
+    def _show_context(self, pos):
+        self.context_menu.emit(self.instance["id"], self.mapToGlobal(pos))
 
 
-class AccountCard(tk.Frame):
-    def __init__(
-        self,
-        parent,
-        account: Dict,
-        theme: Dict[str, str],
-        index: int,
-        selected: bool,
-        on_select: Callable[[int], None],
-        on_delete: Callable[[str], None],
-    ):
-        super().__init__(parent, bg=theme["card_bg"], highlightthickness=1, highlightbackground=theme["card_border"])
-        self.theme = theme
+class AccountCard(QFrame):
+    """An account card with avatar, details, and actions."""
+
+    select_clicked = Signal(int)
+    delete_clicked = Signal(str)
+
+    def __init__(self, account: Dict, theme: Dict[str, str], index: int, selected: bool, parent=None):
+        super().__init__(parent)
         self.account = account
-        th = theme
-        inner = tk.Frame(self, bg=th["card_bg"])
-        inner.pack(fill="x", padx=12, pady=10)
-
-        # avatar
-        av = tk.Canvas(inner, width=48, height=48, bg=th["card_bg"], highlightthickness=0)
-        av.pack(side="left")
-        # skin type affects shape - Steve wider shoulders?
-        skin_color = "#e8c4a8"
-        shirt_color = th["accent"]
-        if account.get("skin_type") == "alex":
-            shirt_color = th["accent_secondary"]
-        av.create_rectangle(8, 4, 40, 24, fill=skin_color, outline="")
-        av.create_rectangle(12, 24, 36, 40, fill=shirt_color, outline="")
-        av.create_rectangle(4, 24, 12, 38, fill=skin_color, outline="")
-        av.create_rectangle(36, 24, 44, 38, fill=skin_color, outline="")
-
-        txt = tk.Frame(inner, bg=th["card_bg"])
-        txt.pack(side="left", padx=12, fill="x", expand=True)
-
-        tk.Label(
-            txt,
-            text=account.get("username", "Steve"),
-            font=("Segoe UI", 11, "bold"),
-            bg=th["card_bg"],
-            fg=th["text_primary"],
-            anchor="w",
-        ).pack(anchor="w")
-        tk.Label(
-            txt,
-            text=f'{account.get("type","offline")} • {account.get("skin_type","steve")} • {account.get("uuid","")[:8]}',
-            font=("Segoe UI", 8),
-            bg=th["card_bg"],
-            fg=th["text_secondary"],
-            anchor="w",
-        ).pack(anchor="w")
-
-        if selected:
-            tk.Label(
-                inner,
-                text="● SELECTED",
-                font=("Segoe UI", 8, "bold"),
-                bg=th["card_bg"],
-                fg=th["success"],
-            ).pack(side="left", padx=8)
-
-        # buttons
-        btn_frame = tk.Frame(inner, bg=th["card_bg"])
-        btn_frame.pack(side="right")
-
-        if not selected:
-            tk.Button(
-                btn_frame,
-                text="Select",
-                font=("Segoe UI", 8, "bold"),
-                bg=th["accent"],
-                fg="white",
-                bd=0,
-                command=lambda: on_select(index),
-            ).pack(side="left", padx=4)
-
-        if len(parent.winfo_children()) > 1 or True:
-            tk.Button(
-                btn_frame,
-                text="✕",
-                font=("Segoe UI", 8),
-                bg=th["card_bg"],
-                fg=th["text_muted"],
-                bd=0,
-                command=lambda: on_delete(account.get("uuid", "")),
-            ).pack(side="left", padx=4)
-
-
-class SettingsRow(tk.Frame):
-    """A row with label + control + description for settings."""
-
-    def __init__(self, parent, title: str, description: str, theme: Dict[str, str], control: tk.Widget | None = None):
-        super().__init__(parent, bg=theme["card_bg"])
         self.theme = theme
-        left = tk.Frame(self, bg=theme["card_bg"])
-        left.pack(side="left", fill="x", expand=True, padx=16, pady=12)
+        self.index = index
+        self.selected = selected
+        self.setObjectName("accountCard")
+        self._build()
 
-        tk.Label(
-            left,
-            text=title,
-            font=("Segoe UI", 10, "bold"),
-            bg=theme["card_bg"],
-            fg=theme["text_primary"],
-            anchor="w",
-        ).pack(anchor="w")
-        tk.Label(
-            left,
-            text=description,
-            font=("Segoe UI", 8),
-            bg=theme["card_bg"],
-            fg=theme["text_secondary"],
-            wraplength=420,
-            justify="left",
-            anchor="w",
-        ).pack(anchor="w", pady=(2, 0))
+    def _build(self):
+        t = self.theme
+        acc = self.account
+
+        self.setFixedHeight(76)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(12)
+
+        # Avatar
+        skin_color = "#e8c4a8"
+        shirt_color = t['accent'] if acc.get("skin_type") != "alex" else t['accent_secondary']
+        avatar = QLabel(acc.get("username", "S")[:1].upper())
+        avatar.setFixedSize(44, 44)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar.setStyleSheet(f"""
+            QLabel {{
+                background-color: {shirt_color};
+                color: white;
+                border-radius: 22px;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+        """)
+        layout.addWidget(avatar)
+
+        # Text
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(3)
+
+        name_lbl = QLabel(acc.get("username", "Steve"))
+        name_lbl.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        name_lbl.setStyleSheet(f"color: {t['text_primary']}; background: transparent;")
+        text_layout.addWidget(name_lbl)
+
+        acc_type = acc.get("type", "offline")
+        skin = acc.get("skin_type", "steve")
+        uuid_short = acc.get("uuid", "")[:8]
+        detail_lbl = QLabel(f"{acc_type} • {skin} • {uuid_short}")
+        detail_lbl.setFont(QFont("Segoe UI", 8))
+        detail_lbl.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
+        text_layout.addWidget(detail_lbl)
+
+        layout.addLayout(text_layout, 1)
+
+        # Selected indicator
+        if self.selected:
+            sel_lbl = QLabel("● SELECTED")
+            sel_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            sel_lbl.setStyleSheet(f"color: {t['success']}; background: transparent;")
+            layout.addWidget(sel_lbl)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(6)
+
+        if not self.selected:
+            select_btn = QPushButton("Select")
+            select_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {t['accent']};
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-weight: bold;
+                    font-size: 11px;
+                }}
+                QPushButton:hover {{
+                    background-color: {t['accent_hover']};
+                }}
+            """)
+            select_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            select_btn.clicked.connect(lambda: self.select_clicked.emit(self.index))
+            btn_layout.addWidget(select_btn)
+
+        del_btn = QPushButton("✕")
+        del_btn.setFixedSize(32, 32)
+        del_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {t['text_muted']};
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {t['error']};
+                color: white;
+            }}
+        """)
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.clicked.connect(lambda: self.delete_clicked.emit(acc.get("uuid", "")))
+        btn_layout.addWidget(del_btn)
+
+        layout.addLayout(btn_layout)
+
+        self.setStyleSheet(f"""
+            QFrame#accountCard {{
+                background-color: {t['card_bg']};
+                border: 1px solid {t['card_border']};
+                border-radius: 10px;
+            }}
+        """)
+
+
+class SettingsRow(QFrame):
+    """A settings row with title, description, and control widget."""
+
+    def __init__(self, title: str, description: str, theme: Dict[str, str],
+                 control: QWidget | None = None, parent=None):
+        super().__init__(parent)
+        self.theme = theme
+        self.setObjectName("settingsRow")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(16)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+
+        title_lbl = QLabel(title)
+        title_lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        title_lbl.setStyleSheet(f"color: {theme['text_primary']}; background: transparent;")
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(description)
+        desc_lbl.setFont(QFont("Segoe UI", 8))
+        desc_lbl.setStyleSheet(f"color: {theme['text_secondary']}; background: transparent;")
+        desc_lbl.setWordWrap(True)
+        text_layout.addWidget(desc_lbl)
+
+        layout.addLayout(text_layout, 1)
 
         if control is not None:
-            right = tk.Frame(self, bg=theme["card_bg"])
-            right.pack(side="right", padx=16)
-            control.pack(in_=right)
-            # reparent control's bg if possible
-            try:
-                control.configure(bg=theme["input_bg"])
-            except Exception:
-                pass
+            layout.addWidget(control)
 
-        # separator
-        sep = tk.Frame(parent, bg=theme["separator"], height=1)
-        sep.pack(fill="x", padx=16)
+        self.setStyleSheet(f"""
+            QFrame#settingsRow {{
+                background-color: {theme['card_bg']};
+                border-radius: 8px;
+            }}
+        """)
