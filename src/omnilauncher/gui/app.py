@@ -221,8 +221,11 @@ class OmniLauncherApp(QMainWindow):
 
         self.setWindowTitle(f"OmniLauncher-MC • v{VERSION}")
         geom = self.settings.get("meta", "window_geometry", default="1180x760")
-        w, h = geom.split("x")
-        self.resize(int(w), int(h))
+        try:
+            w, h = geom.split("x")[:2]
+            self.resize(int(w), int(h))
+        except (ValueError, IndexError):
+            self.resize(1180, 760)
         self.setMinimumSize(1060, 640)
 
         # Services
