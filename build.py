@@ -24,7 +24,6 @@ def _clean_dir(path: str) -> None:
             except OSError:
                 pass
     shutil.rmtree(path, ignore_errors=True)
-    # Retry if rmtree failed (e.g. file still locked)
     if os.path.exists(path):
         shutil.rmtree(path, ignore_errors=True)
 
@@ -33,17 +32,48 @@ def build() -> None:
     sep = ";" if sys.platform == "win32" else ":"
 
     data_files = ["Changelog.txt", "LICENSE.txt", "TERMS.txt"]
-    add_data = [f"--add-data={f}{sep}." for f in data_files]
+    add_data = [f"--add-data={f}{sep}." for f in data_files if os.path.exists(f)]
 
+    # Windowed on Windows so a console does not flash; crashes still show a MessageBox.
     console_flag = "--noconsole" if sys.platform == "win32" else "--console"
 
     _clean_dir("dist")
     _clean_dir("build")
 
-    # Remove stale .spec file to force regeneration
     spec_file = "OmniLauncher-MC.spec"
     if os.path.exists(spec_file):
         os.remove(spec_file)
+
+    hidden = [
+        "PySide6.QtCore",
+        "PySide6.QtGui",
+        "PySide6.QtWidgets",
+        "PySide6.QtNetwork",
+        "shiboken6",
+        "omnilauncher",
+        "omnilauncher.gui",
+        "omnilauncher.gui.app",
+        "omnilauncher.gui.themes",
+        "omnilauncher.gui.components",
+        "omnilauncher.gui.components.sidebar",
+        "omnilauncher.gui.components.cards",
+        "omnilauncher.gui.components.dialogs",
+        "omnilauncher.config",
+        "omnilauncher.config.settings",
+        "omnilauncher.services",
+        "omnilauncher.services.launcher",
+        "omnilauncher.services.versions",
+        "omnilauncher.services.accounts",
+        "omnilauncher.services.instances",
+        "omnilauncher.services.java",
+        "omnilauncher.services.file_explorer",
+        "omnilauncher.services.crash_analyzer",
+        "omnilauncher.services.error_handler",
+        "minecraft_launcher_lib",
+        "minecraft_launcher_lib.utils",
+        "minecraft_launcher_lib.command",
+        "minecraft_launcher_lib.install",
+    ]
 
     cmd = [
         sys.executable,
@@ -55,6 +85,16 @@ def build() -> None:
         "OmniLauncher-MC",
         console_flag,
         "--noconfirm",
+        "--clean",
+        "--paths",
+        "src",
+        "--collect-all",
+        "PySide6",
+        "--collect-all",
+        "shiboken6",
+        "--collect-submodules",
+        "minecraft_launcher_lib",
+        *[item for name in hidden for item in ("--hidden-import", name)],
         *add_data,
     ]
 
