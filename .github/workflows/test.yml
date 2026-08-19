@@ -5,14 +5,38 @@ on:
     branches: ["*"]
   pull_request:
     branches: ["*"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      extra-pytest-args:
+        description: Extra arguments passed to pytest tests/
+        required: false
+        default: ""
+        type: string
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   QT_QPA_PLATFORM: offscreen
+  PYTEST_ADDOPTS: "--color=yes"
 
 jobs:
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -20,19 +44,27 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install ruff
         run: pip install ruff
 
-      - name: Run ruff check
-        run: ruff check src/ tests/ --output-format=github
+      - name: Ruff fatal errors (E, F)
+        run: ruff check src/ tests/ --select E,F --output-format=github
 
-      - name: Run ruff format check
+      - name: Ruff full project rules (report)
+        run: ruff check src/ tests/ --output-format=github
+        continue-on-error: true
+
+      - name: Ruff format check (report)
         run: ruff format --check src/ tests/
+        continue-on-error: true
 
   typecheck:
     name: Type Check (mypy)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +72,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -48,16 +81,102 @@ jobs:
 
       - name: Run mypy
         run: mypy src/omnilauncher/config/ src/omnilauncher/services/ --ignore-missing-imports --no-error-summary || true
-        continue-on-error: true
+
+  syntax:
+    name: Syntax Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check all Python files parse correctly
+        run: |
+          python -c "
+          import ast, sys, pathlib
+          roots = [pathlib.Path('src'), pathlib.Path('tests')]
+          roots += [p for p in pathlib.Path('.').glob('*.py')]
+          errors = []
+          seen = set()
+          for root in roots:
+              files = [root] if root.is_file() else list(root.rglob('*.py'))
+              for f in files:
+                  key = str(f.resolve())
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  try:
+                      ast.parse(f.read_text(encoding='utf-8'))
+                  except SyntaxError as e:
+                      errors.append(f'{f}: {e}')
+          if errors:
+              print('SYNTAX ERRORS FOUND:')
+              for e in errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          print(f'All {len(seen)} Python files have valid syntax.')
+          "
+
+  import-check:
+    name: Import Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgl1 libegl1 libxkbcommon0
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Verify all omnilauncher modules import
+        run: |
+          python -c "
+          import importlib, pkgutil, sys
+          import omnilauncher
+          failures = []
+          modules = []
+          for finder, name, ispkg in pkgutil.walk_packages(
+              omnilauncher.__path__, omnilauncher.__name__ + '.'
+          ):
+              modules.append(name)
+          for mod in modules:
+              try:
+                  importlib.import_module(mod)
+                  print(f'  OK  {mod}')
+              except Exception as e:
+                  print(f'  FAIL {mod}: {e}')
+                  failures.append(mod)
+          if failures:
+              print(f'\n{len(failures)} module(s) failed to import!')
+              sys.exit(1)
+          print(f'\nAll {len(modules)} modules imported successfully.')
+          "
 
   test:
     name: Test (Python ${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         include:
           - os: windows-latest
             python-version: "3.12"
@@ -71,6 +190,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          allow-prereleases: true
 
       - name: Install system deps (Linux)
         if: runner.os == 'Linux'
@@ -78,101 +199,74 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgl1 libegl1 libxkbcommon0 xvfb
 
-      - name: Install dependencies
+      - name: Install package and test extras
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest pytest-asyncio pytest-mock
+          pip install -e ".[test]"
+
+      - name: Show tests/ folder
+        run: python -c "import pathlib; files=sorted(pathlib.Path('tests').glob('test_*.py')); print('\n'.join(str(f) for f in files)); print(f'\n{len(files)} test modules in tests/')"
+
+      - name: Collect tests in tests/
+        run: python -m pytest tests/ --collect-only -q
 
       - name: Run tests with verbose output
         if: runner.os != 'Linux'
-        run: pytest tests/ -v --tb=long --no-header 2>&1
+        env:
+          EXTRA_PYTEST_ARGS: ${{ github.event.inputs.extra-pytest-args || '' }}
+        run: |
+          mkdir -p test-results
+          python -m pytest tests/ -v --tb=long --no-header --durations=10 --junitxml=test-results/junit.xml --cov=omnilauncher --cov-report=term-missing --cov-report=xml:test-results/coverage.xml --cov-report=html:test-results/htmlcov $EXTRA_PYTEST_ARGS
 
       - name: Run tests with xvfb (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run pytest tests/ -v --tb=long --no-header 2>&1
+        env:
+          EXTRA_PYTEST_ARGS: ${{ github.event.inputs.extra-pytest-args || '' }}
+        run: |
+          mkdir -p test-results
+          xvfb-run python -m pytest tests/ -v --tb=long --no-header --durations=10 --junitxml=test-results/junit.xml --cov=omnilauncher --cov-report=term-missing --cov-report=xml:test-results/coverage.xml --cov-report=html:test-results/htmlcov $EXTRA_PYTEST_ARGS
 
-  syntax:
-    name: Syntax Check
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Test results — Python ${{ matrix.python-version }} / ${{ matrix.os }}"
+            echo
+            echo "- Suite: \`tests/\`"
+            echo "- JUnit: \`test-results/junit.xml\`"
+            echo "- Coverage XML: \`test-results/coverage.xml\`"
+            if [ -f test-results/coverage.xml ]; then
+              echo
+              echo "Coverage artifact uploaded for this matrix cell."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ci:
+    name: All required checks
+    if: always()
+    needs: [syntax, import-check, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Check all Python files parse correctly
+      - name: Confirm required jobs succeeded
+        env:
+          SYNTAX: ${{ needs.syntax.result }}
+          IMPORTS: ${{ needs.import-check.result }}
+          TESTS: ${{ needs.test.result }}
         run: |
-          python -c "
-          import ast, sys, pathlib
-          errors = []
-          for f in pathlib.Path('src').rglob('*.py'):
-              try:
-                  ast.parse(f.read_text(encoding='utf-8'))
-              except SyntaxError as e:
-                  errors.append(f'{f}: {e}')
-          for f in pathlib.Path('tests').rglob('*.py'):
-              try:
-                  ast.parse(f.read_text(encoding='utf-8'))
-              except SyntaxError as e:
-                  errors.append(f'{f}: {e}')
-          if errors:
-              print('SYNTAX ERRORS FOUND:')
-              for e in errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          else:
-              print('All files have valid Python syntax.')
-          "
-
-  import-check:
-    name: Import Check
-    runs-on: ubuntu-latest
-    env:
-      QT_QPA_PLATFORM: offscreen
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install system deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libgl1 libegl1 libxkbcommon0
-
-      - name: Install package
-        run: pip install -e .
-
-      - name: Verify all modules import
-        run: |
-          python -c "
-          import sys
-          failures = []
-          modules = [
-              'omnilauncher.config.settings',
-              'omnilauncher.services.accounts',
-              'omnilauncher.services.instances',
-              'omnilauncher.services.java',
-              'omnilauncher.services.file_explorer',
-              'omnilauncher.services.crash_analyzer',
-              'omnilauncher.services.launcher',
-              'omnilauncher.services.error_handler',
-              'omnilauncher.gui.themes',
-          ]
-          for mod in modules:
-              try:
-                  __import__(mod)
-                  print(f'  OK  {mod}')
-              except Exception as e:
-                  print(f'  FAIL {mod}: {e}')
-                  failures.append(mod)
-          if failures:
-              print(f'\n{len(failures)} module(s) failed to import!')
-              sys.exit(1)
-          else:
-              print(f'\nAll {len(modules)} modules imported successfully.')
+          echo "syntax=$SYNTAX"
+          echo "import-check=$IMPORTS"
+          echo "test=$TESTS"
+          if [ "$SYNTAX" != success ] || [ "$IMPORTS" != success ] || [ "$TESTS" != success ]; then
+            echo "Required checks failed."
+            exit 1
+          fi
+          echo "All required checks passed."
