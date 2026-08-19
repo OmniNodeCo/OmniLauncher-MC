@@ -2,14 +2,17 @@
 
 Usage:
     uv run --with pyinstaller python build.py
-    uv sync --group build && python build.py
+    uv sync --extra build && python build.py
 """
+
+from __future__ import annotations
 
 import os
 import shutil
 import stat
 import subprocess
 import sys
+from pathlib import Path
 
 
 def _clean_dir(path: str) -> None:
@@ -28,14 +31,36 @@ def _clean_dir(path: str) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
+def _copy_qt_platforms(dist_dir: Path) -> None:
+    """Copy Qt platform plugins next to the exe so Windows can find them."""
+    plugin_names = ("qwindows.dll", "libqxcb.so", "libqcocoa.dylib")
+    dest = dist_dir / "platforms"
+    copied = False
+    for root, _dirs, files in os.walk(dist_dir):
+        for name in plugin_names:
+            if name not in files:
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            src = Path(root) / name
+            if src.resolve() == (dest / name).resolve():
+                copied = True
+                continue
+            shutil.copy2(src, dest / name)
+            copied = True
+    if copied:
+        print(f"Copied Qt platform plugins to {dest}")
+    else:
+        print("WARNING: no Qt platform plugin found in dist/")
+
+
 def build() -> None:
     sep = ";" if sys.platform == "win32" else ":"
 
     data_files = ["Changelog.txt", "LICENSE.txt", "TERMS.txt"]
     add_data = [f"--add-data={f}{sep}." for f in data_files if os.path.exists(f)]
 
-    # Windowed on Windows so a console does not flash; crashes still show a MessageBox.
-    console_flag = "--noconsole" if sys.platform == "win32" else "--console"
+    # onedir + console: Qt can find plugins, and startup errors are visible.
+    console_flag = "--console"
 
     _clean_dir("dist")
     _clean_dir("build")
@@ -75,12 +100,14 @@ def build() -> None:
         "minecraft_launcher_lib.install",
     ]
 
+    runtime_hook = "hook-qt-plugins.py"
+
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
         "main.py",
-        "--onefile",
+        "--onedir",
         "--name",
         "OmniLauncher-MC",
         console_flag,
@@ -94,11 +121,22 @@ def build() -> None:
         "shiboken6",
         "--collect-submodules",
         "minecraft_launcher_lib",
+        "--runtime-hook",
+        runtime_hook,
         *[item for name in hidden for item in ("--hidden-import", name)],
         *add_data,
     ]
 
     subprocess.check_call(cmd)
+
+    dist_dir = Path("dist") / "OmniLauncher-MC"
+    _copy_qt_platforms(dist_dir)
+
+    # Convenience copy for tools that still look for dist/*.exe
+    exe_name = "OmniLauncher-MC.exe" if sys.platform == "win32" else "OmniLauncher-MC"
+    built = dist_dir / exe_name
+    if built.exists():
+        print(f"Built {built}")
 
 
 if __name__ == "__main__":
@@ -107,7 +145,7 @@ if __name__ == "__main__":
     except ImportError:
         sys.exit(
             "PyInstaller not found. Install it with:\n"
-            "  uv sync --group build\n"
+            "  uv sync --extra build\n"
             "  uv pip install pyinstaller\n"
             "  uv run --with pyinstaller python build.py"
         )
