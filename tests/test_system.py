@@ -56,20 +56,21 @@ def test_themes_no_external_deps():
 
 
 def test_gui_without_display():
-    """Test that importing gui.app doesn't immediately create Tk window."""
+    """Importing gui.app must not auto-launch a window."""
+    import pathlib
+
+    text = pathlib.Path("src/omnilauncher/gui/app.py").read_text(encoding="utf-8")
+    assert "class OmniLauncherApp" in text
+    assert "def main" in text
+
     try:
         from omnilauncher.gui import app as app_module
 
-        # main exists, but OmniLauncherApp should not auto-run on import
-        # Ensure that importing doesn't create Tk root
-        # The __init__ creates Tk, so we just check it exists
         assert hasattr(app_module, "OmniLauncherApp")
-    except Exception as e:
-        # In headless env, tkinter may fail, but import should still work for non-Tk parts
-        if "no display" in str(e).lower() or "tkinter" in str(e).lower():
-            pass
-        else:
-            raise
+        assert hasattr(app_module, "main")
+    except ImportError:
+        # Headless runners without Qt/libGL still validate the source above
+        pass
 
 
 def test_file_permissions():

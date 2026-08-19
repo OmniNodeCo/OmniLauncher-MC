@@ -72,44 +72,37 @@ def test_gui_components_importable():
 
 
 def test_settings_row_packing_logic():
-    """Test the fixed _settings_row logic doesn't raise TclError for wrapper case.
-    We simulate the logic without actual Tk by checking code path.
-    """
-    # This test verifies our fix for the earlier bug: wrapper Frame containing Checkbutton
-    # The bug was: can't pack checkbutton inside other frame
-    # Our fix should handle wrapper -> right packing
-    # Here we just test that the method exists and has the improved logic
+    """PySide6 settings rows use _add_settings_row (no tkinter pack)."""
+    import pathlib
+
+    text = pathlib.Path("src/omnilauncher/gui/app.py").read_text(encoding="utf-8")
+    assert "def _add_settings_row" in text
+    assert "parent_layout" in text
+    assert "QFrame" in text
+
     try:
         from omnilauncher.gui.app import OmniLauncherApp
         import inspect
 
-        src = inspect.getsource(OmniLauncherApp._settings_row)
-        # Should contain handling for wrapper case
-        assert "wrapper" in src.lower() or "master" in src
-        assert "TclError" in src or "try" in src
-        # Should not contain the old buggy line alone
-        assert "widget.pack(in_=right)" in src or "widget.pack" in src
-    except ModuleNotFoundError as e:
-        # tkinter missing in CI - skip but consider pass
-        assert "tkinter" in str(e).lower() or True
-        # Check file directly without importing tkinter
-        import pathlib
-
-        text = pathlib.Path("src/omnilauncher/gui/app.py").read_text(encoding="utf-8")
-        assert "_settings_row" in text
-        assert "master" in text.lower()
+        src = inspect.getsource(OmniLauncherApp._add_settings_row)
+        assert "control" in src
+        assert "parent_layout" in src
+    except ImportError:
+        # Headless runners without Qt/libGL still validate the source above
+        pass
 
 
 def test_main_entry_importable():
+    import pathlib
+
+    app_path = pathlib.Path("src/omnilauncher/gui/app.py")
+    assert app_path.exists()
+    text = app_path.read_text(encoding="utf-8")
+    assert "def main" in text
+
     try:
         from omnilauncher.gui import app
         assert hasattr(app, "main")
         assert callable(app.main)
-    except ModuleNotFoundError as e:
-        # tkinter missing in headless env - check file exists and defines main
-        import pathlib
-
-        assert pathlib.Path("src/omnilauncher/gui/app.py").exists()
-        text = pathlib.Path("src/omnilauncher/gui/app.py").read_text()
-        assert "def main" in text
-        assert "tkinter" in str(e).lower() or True
+    except ImportError:
+        pass

@@ -26,13 +26,24 @@ def _fetch_all_versions_raw() -> List[Dict]:
             {"id": "1.20.1", "type": "release"},
             {"id": "1.19.4", "type": "release"},
         ]
+    fallback = [
+        {"id": "1.21.1", "type": "release"},
+        {"id": "1.21", "type": "release"},
+        {"id": "1.20.6", "type": "release"},
+        {"id": "1.20.1", "type": "release"},
+        {"id": "1.19.4", "type": "release"},
+    ]
     try:
-        return mc_utils.get_version_list()
+        result = mc_utils.get_version_list()
+        if result:
+            return result
     except Exception:
-        # fallback if offline
         if _CACHE["list"]:
             return _CACHE["list"]
-        return []
+        return fallback
+    if _CACHE["list"]:
+        return _CACHE["list"]
+    return fallback
 
 
 def _get_latest_raw() -> Dict[str, str]:

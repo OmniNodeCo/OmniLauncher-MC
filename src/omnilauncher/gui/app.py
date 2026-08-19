@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QMenu,
-    QSpinBox,
+    QDialog,
     QColorDialog,
     QTabWidget,
     QSplitter,
