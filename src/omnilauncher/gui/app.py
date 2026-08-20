@@ -911,16 +911,6 @@ class OmniLauncherApp(QMainWindow):
         tb_layout.addWidget(search)
 
         filter_combo = QComboBox()
-        filteetObjectName("header")
-        toolbar.setFixedHeight(48)
-        tb_layout = QHBoxLayout(toolbar)
-        tb_layout.setContentsMargins(12, 0, 12, 0)
-
-        search = QLineEdit()
-        search.setPlaceholderText("🔍 Search servers...")
-        tb_layout.addWidget(search)
-
-        filter_combo = QComboBox()
         filter_combo.addItems(["All", "Survival", "Creative", "Minigames", "PvP", "Vanilla"])
         tb_layout.addWidget(filter_combo)
 
