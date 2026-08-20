@@ -240,6 +240,7 @@ class OmniLauncherApp(QMainWindow):
         self.current_page = "play"
         self.versions_list: List[str] = []
         self._console_lines: List[str] = []
+        self._updating_ui = False
 
         # Build UI
         self._build_ui()
@@ -1999,18 +2000,25 @@ class OmniLauncherApp(QMainWindow):
         if not ids:
             ids = ["1.21.1", "1.20.1"]
         self.versions_list = ids
-        self.version_combo.clear()
-        self.version_combo.addItems(ids)
+        self.version_combo.blockSignals(True)
+        try:
+            self.version_combo.clear()
+            self.version_combo.addItems(ids)
 
-        inst = self.settings.current_instance
-        ver = inst.get("version") or get_latest_version(self.settings)
-        if ver in ids:
-            self.version_combo.setCurrentText(ver)
-        elif ids:
-            self.version_combo.setCurrentText(ids[0])
+            inst = self.settings.current_instance
+            ver = inst.get("version") or get_latest_version(self.settings)
+            if ver in ids:
+                self.version_combo.setCurrentText(ver)
+            elif ids:
+                self.version_combo.setCurrentText(ids[0])
+        finally:
+            self.version_combo.blockSignals(False)
         self.footer_version_label.setText(f"{self.version_combo.currentText()} • Vanilla")
 
     def _refresh_play_page(self):
+        if getattr(self, "_updating_ui", False):
+            return
+        self._updating_ui = True
         t = self.theme
         inst = self.settings.current_instance if self.settings else {
             "name": "Latest Release", "version": "1.21.1", "group": "Vanilla",
@@ -2056,7 +2064,9 @@ class OmniLauncherApp(QMainWindow):
             """)
 
             if not self.version_combo.currentText():
+                self.version_combo.blockSignals(True)
                 self.version_combo.setCurrentText(ver)
+                self.version_combo.blockSignals(False)
 
             # Favorites
             # Clear existing fav items
@@ -2098,21 +2108,30 @@ class OmniLauncherApp(QMainWindow):
                 cl.addWidget(play_btn)
                 self.play_fav_layout.addWidget(card)
 
-            # Accounts combo
+            # Accounts combo — block signals so setCurrentText cannot recurse
             accs = self.settings.get("accounts", "list", default=[])
             names = [a.get("username", "Steve") for a in accs]
-            self.account_combo.clear()
-            self.account_combo.addItems(names)
-            sel_idx = self.settings.get("accounts", "selected_index", default=0)
-            if 0 <= sel_idx < len(names):
-                self.account_combo.setCurrentText(names[sel_idx])
-                self.play_account_sub.setText(f"{accs[sel_idx].get('type', 'offline')} • {accs[sel_idx].get('skin_type', 'steve')}")
+            self.account_combo.blockSignals(True)
+            try:
+                self.account_combo.clear()
+                self.account_combo.addItems(names)
+                sel_idx = self.settings.get("accounts", "selected_index", default=0)
+                if 0 <= sel_idx < len(names):
+                    self.account_combo.setCurrentText(names[sel_idx])
+                    self.play_account_sub.setText(
+                        f"{accs[sel_idx].get('type', 'offline')} • {accs[sel_idx].get('skin_type', 'steve')}"
+                    )
+            finally:
+                self.account_combo.blockSignals(False)
 
+            sel_idx = self.settings.get("accounts", "selected_index", default=0)
             if accs and 0 <= sel_idx < len(accs):
                 self.sidebar.update_user(names[sel_idx], "Ready • Offline")
 
         except Exception:
             pass
+        finally:
+            self._updating_ui = False
 
     def _refresh_instances(self):
         t = self.theme
@@ -2420,11 +2439,16 @@ class OmniLauncherApp(QMainWindow):
             self._refresh_play_page()
 
     def _on_account_combo_changed(self, name: str):
+        if getattr(self, "_updating_ui", False) or not name:
+            return
         accs = self.settings.get("accounts", "list", default=[])
         for idx, acc in enumerate(accs):
             if acc.get("username") == name:
                 self.settings.select_account(idx)
-                self._refresh_play_page()
+                self.play_account_sub.setText(
+                    f"{acc.get('type', 'offline')} • {acc.get('skin_type', 'steve')}"
+                )
+                self.sidebar.update_user(name, "Ready • Offline")
                 break
 
     def _on_play_version_changed(self, ver: str):
