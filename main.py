@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import faulthandler
 import os
 import sys
 import traceback
@@ -25,25 +26,51 @@ def _log_path() -> Path:
 
 
 def _log(message: str) -> None:
-    try:
-        path = _log_path()
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(message.rstrip() + "\n")
-    except Exception:
+    line = message.rstrip() + "\n"
+    for path in (_log_path(), Path.home() / "OmniLauncher-MC-startup.log"):
         try:
-            fallback = Path.home() / "OmniLauncher-MC-startup.log"
-            with fallback.open("a", encoding="utf-8") as fh:
-                fh.write(message.rstrip() + "\n")
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(line)
+                fh.flush()
+            return
         except Exception:
+            continue
+
+
+def _prepare_dll_search() -> None:
+    """Windows 3.8+ will not load Qt DLLs from _internal unless we add it."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return
+    dirs = []
+    internal = _app_dir() / "_internal"
+    if internal.is_dir():
+        dirs.append(internal)
+    meipass = _frozen_base()
+    if meipass.is_dir() and meipass not in dirs:
+        dirs.append(meipass)
+    for folder in dirs:
+        try:
+            os.add_dll_directory(str(folder))
+        except (OSError, AttributeError):
             pass
+        os.environ["PATH"] = str(folder) + os.pathsep + os.environ.get("PATH", "")
+        _log(f"dll search: {folder}")
+        # PySide6 often keeps Qt6Core.dll in a nested folder
+        for core in folder.rglob("Qt6Core.dll"):
+            parent = str(core.parent)
+            try:
+                os.add_dll_directory(parent)
+            except (OSError, AttributeError):
+                pass
+            os.environ["PATH"] = parent + os.pathsep + os.environ.get("PATH", "")
+            _log(f"dll search: {parent}")
+            break
 
 
 def _find_platforms_dir() -> Path | None:
     plugin_names = ("qwindows.dll", "libqxcb.so", "libqcocoa.dylib")
-    roots = [_app_dir(), _app_dir() / "platforms", _frozen_base()]
-    internal = _app_dir() / "_internal"
-    if internal.exists():
-        roots.append(internal)
+    exe_dir = _app_dir()
+    roots = [_frozen_base(), exe_dir / "_internal"]
     seen: set[str] = set()
     for root in roots:
         if not root.exists():
@@ -52,12 +79,11 @@ def _find_platforms_dir() -> Path | None:
         if key in seen:
             continue
         seen.add(key)
-        # Fast path: already next to the exe
-        direct = root / "platforms" if root.name != "platforms" else root
-        for name in plugin_names:
-            if (direct / name).is_file():
-                return direct
         for dirpath, _dirnames, filenames in os.walk(root):
+            # Do not use a platforms folder sitting beside the exe — those
+            # copies of qwindows.dll cannot load Qt6Gui from _internal.
+            if Path(dirpath).parent == exe_dir:
+                continue
             for name in plugin_names:
                 if name in filenames:
                     return Path(dirpath)
@@ -94,9 +120,17 @@ def main() -> None:
         _log_path().write_text("OmniLauncher-MC starting\n", encoding="utf-8")
     except Exception:
         pass
+    try:
+        faulthandler.enable(open(_log_path(), "a", encoding="utf-8"))
+    except Exception:
+        try:
+            faulthandler.enable()
+        except Exception:
+            pass
     _log(f"frozen={getattr(sys, 'frozen', False)}")
     _log(f"executable={sys.executable}")
     _log(f"meipass={getattr(sys, '_MEIPASS', '')}")
+    _prepare_dll_search()
     _configure_qt_plugins()
     try:
         _log("importing omnilauncher.gui.app")
@@ -104,6 +138,7 @@ def main() -> None:
 
         _log("starting GUI")
         gui_main()
+        _log("GUI exited")
     except Exception:
         text = traceback.format_exc()
         _log(text)

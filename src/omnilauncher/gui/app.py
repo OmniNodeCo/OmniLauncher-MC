@@ -2668,10 +2668,23 @@ class OmniLauncherApp(QMainWindow):
 
 
 def main():
+    def _dbg(msg: str) -> None:
+        try:
+            log = (
+                Path(sys.executable).resolve().parent / "omnilauncher-startup.log"
+                if getattr(sys, "frozen", False)
+                else Path.cwd() / "omnilauncher-startup.log"
+            )
+            with log.open("a", encoding="utf-8") as fh:
+                fh.write(msg + "\n")
+                fh.flush()
+        except Exception:
+            pass
+
+    _dbg("QApplication()")
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-
-    # Set default palette for proper dark theme
+    _dbg("palette")
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor("#1a1d27"))
     palette.setColor(QPalette.ColorRole.WindowText, QColor("#e6e8f0"))
@@ -2688,8 +2701,11 @@ def main():
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
     app.setPalette(palette)
 
+    _dbg("OmniLauncherApp()")
     window = OmniLauncherApp()
+    _dbg("show()")
     window.show()
+    _dbg("exec()")
     sys.exit(app.exec())
 
 

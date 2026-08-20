@@ -31,28 +31,6 @@ def _clean_dir(path: str) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
-def _copy_qt_platforms(dist_dir: Path) -> None:
-    """Copy Qt platform plugins next to the exe so Windows can find them."""
-    plugin_names = ("qwindows.dll", "libqxcb.so", "libqcocoa.dylib")
-    dest = dist_dir / "platforms"
-    copied = False
-    for root, _dirs, files in os.walk(dist_dir):
-        for name in plugin_names:
-            if name not in files:
-                continue
-            dest.mkdir(parents=True, exist_ok=True)
-            src = Path(root) / name
-            if src.resolve() == (dest / name).resolve():
-                copied = True
-                continue
-            shutil.copy2(src, dest / name)
-            copied = True
-    if copied:
-        print(f"Copied Qt platform plugins to {dest}")
-    else:
-        print("WARNING: no Qt platform plugin found in dist/")
-
-
 def build() -> None:
     sep = ";" if sys.platform == "win32" else ":"
 
@@ -130,9 +108,6 @@ def build() -> None:
     subprocess.check_call(cmd)
 
     dist_dir = Path("dist") / "OmniLauncher-MC"
-    _copy_qt_platforms(dist_dir)
-
-    # Convenience copy for tools that still look for dist/*.exe
     exe_name = "OmniLauncher-MC.exe" if sys.platform == "win32" else "OmniLauncher-MC"
     built = dist_dir / exe_name
     if built.exists():
