@@ -470,7 +470,8 @@ class OmniLauncherApp(QMainWindow):
         vc_layout.addWidget(make_section_label("Version", t, 9))
 
         self.version_combo = QComboBox()
-        self.version_combo.currentTextChanged.connect(self._on_play_version_changed)
+        # textActivated fires only on user choice, never on clear/addItems
+        self.version_combo.textActivated.connect(self._on_play_version_changed)
         vc_layout.addWidget(self.version_combo)
 
         filter_layout = QHBoxLayout()
@@ -500,7 +501,8 @@ class OmniLauncherApp(QMainWindow):
         ac_layout.addWidget(make_section_label("Account", t, 9))
 
         self.account_combo = QComboBox()
-        self.account_combo.currentTextChanged.connect(self._on_account_combo_changed)
+        # textActivated fires only on user choice, never on clear/addItems
+        self.account_combo.textActivated.connect(self._on_account_combo_changed)
         ac_layout.addWidget(self.account_combo)
 
         self.play_account_sub = QLabel("Offline • Steve skin")
@@ -900,6 +902,16 @@ class OmniLauncherApp(QMainWindow):
         # Search toolbar
         toolbar = QFrame()
         toolbar.setObjectName("header")
+        toolbar.setFixedHeight(48)
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(12, 0, 12, 0)
+
+        search = QLineEdit()
+        search.setPlaceholderText("🔍 Search servers...")
+        tb_layout.addWidget(search)
+
+        filter_combo = QComboBox()
+        filteetObjectName("header")
         toolbar.setFixedHeight(48)
         tb_layout = QHBoxLayout(toolbar)
         tb_layout.setContentsMargins(12, 0, 12, 0)
