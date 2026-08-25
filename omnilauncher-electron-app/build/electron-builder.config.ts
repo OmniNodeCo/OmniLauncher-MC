@@ -96,6 +96,8 @@ export const config = {
   },
   linux: {
     executableName: 'omnilauncher-mc',
+    maintainer: 'OmniNodeCo <179980294+OmniNodeCo@users.noreply.github.com>',
+    vendor: 'OmniNodeCo',
     electronLanguages: ['en-US'],
     desktop: {
       MimeType: 'x-scheme-handler/omnilauncher',

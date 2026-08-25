@@ -3,7 +3,7 @@
     "private": true,
     "main": "./index.js",
     "version": "0.67.1",
-    "author": "OmniNodeCo",
+    "author": "OmniNodeCo <179980294+OmniNodeCo@users.noreply.github.com>",
     "description": "OmniLauncher-MC — an open-source Minecraft launcher",
     "license": "MIT",
     "engines": {
