@@ -1,88 +1,73 @@
-# OmniLauncher-MC v0.2.0
+# OmniLauncher-MC
 
-A modern, open-source Minecraft launcher built with Python & PySide6.
+A modern, open-source Minecraft launcher for Windows, macOS, and Linux.
 
-![Dark Theme](https://img.shields.io/badge/theme-dark%20%7C%20midnight%20%7C%20amoled-%23e94560) ![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.2.0-brightgreen) ![GUI](https://img.shields.io/badge/GUI-PySide6%20(Qt)-green)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Electron](https://img.shields.io/badge/ui-Electron%20%2B%20Vue-42b883)
+![Node](https://img.shields.io/badge/node-22%2B-brightgreen)
 
-## ✨ What's new in 0.2.0
+**Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.**
 
-Complete GUI remake from tkinter to **PySide6 (Qt 6)** for a much smoother, native-feeling experience:
+## Features
 
-### GUI Framework
-- **PySide6** replaces tkinter — native Qt widgets, better rendering, smoother animations
-- **QSS Stylesheets** (Qt Style Sheets) for rich theming — similar to CSS
-- **Signal/Slot architecture** for clean inter-component communication
-- **QThread workers** for background tasks (version fetching, Java detection)
-- **QStackedWidget** for page switching with zero flicker
-- **QScrollArea** with native scroll bars
+- Download and launch Minecraft, Forge, Fabric, Quilt, NeoForge, OptiFine, and JVM runtimes
+- Fast concurrent downloads with connection reuse
+- Multiple isolated instances (mods, versions, and launch settings)
+- Resource linking so mods are not copied everywhere
+- Built-in CurseForge and Modrinth browsing, install, and modpack import/export
+- Microsoft, Mojang Yggdrasil, and third-party auth servers
+- Peer-to-peer multiplayer over LAN-style connections
+- Appearance, Java, and launch settings with a dark UI
 
-### UI / Layout (preserved from 0.2.0 + enhanced)
-- **Sidebar navigation** (240px) with logo `O`, 11 sections with active indicator border
-- **Themes**: Dark, Midnight, Light, AMOLED + accent color picker with 14 presets
-- **Header** with refresh + open .minecraft
-- **Footer** with status, progress bar, version label, big PLAY button
-- **All 11 pages** fully preserved: Play, Instances, Accounts, Mods, Explorer, Servers, Friends, Skins, Settings, Console, About
+## Install
 
-### Pages (all preserved)
-- **Play**: banner, selected instance card, version/account selectors, RAM slider, quick play, favorites, news
-- **Instances**: search, sort, grid/list toggle, grouped InstanceCard widgets, context menu
-- **Accounts**: add offline, AccountCard widgets, select/delete
-- **Mods & Addons**: placeholder with 5 category cards
-- **File Explorer**: bookmarks, file list, double-click navigation, up/refresh/open-in-OS
-- **Server Browser**: search, server cards with join
-- **Friends List**: experimental toggle, friend cards
-- **Skins**: preview, skin type selector
-- **Settings**: 7 sub-pages (60+ options) — General, Java, Game, Appearance, Network, Launcher, Advanced
-- **Console**: real-time log, search, filters, crash analyzer, export/copy
-- **About**: changelog, license, system info
+Releases: [github.com/OmniNodeCo/OmniLauncher-MC/releases](https://github.com/OmniNodeCo/OmniLauncher-MC/releases)
 
-### Technical
-- Removed tkinter dependency entirely
-- PySide6 >= 6.6 required
-- All backend services unchanged (settings, accounts, instances, java, versions, launcher, file_explorer, crash_analyzer)
-- Version stays at 0.2.0
+Data is stored under:
 
-## 📦 Installation
+- Windows: `%APPDATA%\OmniLauncher-MC`
+- macOS / Linux: `~/Library/Application Support/OmniLauncher-MC` or `~/.config` / app data as provided by Electron
+
+## Develop
+
+Requires **Node.js 22.16+** and **pnpm 11**.
 
 ```bash
-pip install -e .
-# or
-uv sync
-python main.py
+pnpm install
+pnpm dev:renderer   # UI (Vite)
+pnpm dev:main       # Electron main process
 ```
 
-Requires `minecraft-launcher-lib` and `PySide6>=6.6`.
+Build:
 
-## 🚀 Usage
+```bash
+pnpm build:renderer
+pnpm build
+```
 
-1. Add offline account (3-16 chars)
-2. Create/select instance, pick version (enable snapshots in General if needed)
-3. Adjust RAM in Play or Java settings
-4. Launch with PLAY — progress in footer, logs in Console
-5. If crash, Console > Analyze Crash
-6. Explore files via File Explorer bookmarks
+Tests:
 
-Settings persist in:
-- Windows: `%APPDATA%/OmniLauncher-MC/settings.json`
-- Linux/macOS: `~/.config/omnilauncher/settings.json`
-- Fallback: project root `settings.json`
+```bash
+pnpm test
+pnpm check
+```
 
-## 🔒 Security
-- Fractureiser malware pattern detection
-- Offline UUID uses Java's OfflinePlayer:<username> MD5 v3
+Workspace layout:
 
-## 🗺️ Roadmap
-- Modrinth & CurseForge API search + one-click install + dependency resolve
-- Real server browser ping + favorites
-- Friends list with Microsoft auth
-- Drag-drop in file explorer, file watcher
-- Animated gradient background
-- Skin upload and cape support
-
-## 📜 Credits
-- Original OmniLauncher-MC authors
-- Modern launcher UX inspirations (dark themes, sidebar, instance management)
-- PySide6 / Qt for the GUI framework
+| Path | Role |
+| --- | --- |
+| `omnilauncher-electron-app` | Electron shell, packaging |
+| `omnilauncher-ui` | Vue UI |
+| `omnilauncher-runtime` | Launcher services |
+| `omnilauncher-runtime-api` | Shared API types |
+| `packages/*` | Minecraft libraries |
 
 ## License
-MIT - see LICENSE.txt
+
+[MIT](LICENSE) — Copyright OmniNodeCo, including MIT-licensed work originally published by ci010.
+
+## Credits
+
+Core launch, install, and UI architecture is derived from the MIT-licensed
+[X Minecraft Launcher](https://github.com/Voxelum/x-minecraft-launcher) by ci010 and contributors.
+OmniLauncher-MC is a separate product with its own name, branding, and GitHub project.

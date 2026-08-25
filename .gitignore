@@ -1,42 +1,36 @@
-.venv
-.idea
-launcher.log
+.DS_Store
+*/dist/**/*
+**/dist/
+*.gen
+coverage
+node_modules/
+npm-debug.log
+npm-debug.log.*
+thumbs.db
+!.gitkeep
+*.lock
+*.log
+*.bin
+/temp
+omnilauncher-electron-app/build/appx
+.env
 
-logs/
-settings.json
-uv.lock
+p2p.network
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-dist/
-build/
-*.egg
+*/build/output/*
+package-lock.json
 
-# IDE
+
+## CODE EDITORS
 .vscode/
-*.swp
-*.swo
+.zed/
+/docs/
+!/docs/tutorial/
 
-# Build
-*.spec
-*.exe
-*.msi
+# e2e artifacts
+e2e/artifacts/
+e2e/playwright-report/
+e2e/test-results/
 
-# Generated assets
-assets/
-icon-*.png
-installer-banner.png
-installer-logo.png
-
-# Build output
-dist/
-build/
-installer-output/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
+# local download-probe / benchmark artifacts (opt-in tests)
+/bench-out/
