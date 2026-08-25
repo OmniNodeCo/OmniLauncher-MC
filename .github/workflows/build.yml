@@ -4,80 +4,97 @@ on:
   workflow_dispatch:
 
 env:
-  UV_SYSTEM_PYTHON: 1
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: pnpm/action-setup@v4
         with:
-          python-version: '3.12'
+          version: 11
 
-      - name: Install uv
-        run: pip install uv
+      - name: Fix node-gyp / Python
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: python3 -m pip install --break-system-packages --user packaging setuptools
 
-      - name: Install dependencies
-        run: uv sync --extra build
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - name: Build with PyInstaller
-        run: uv run --with pyinstaller python build.py
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.cache/electron
+            ${{ github.workspace }}/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Upload artifact
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+
+      - name: Build renderer + Electron
+        run: |
+          pnpm build:renderer
+          pnpm build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          NODE_ENV: production
+          RELEASE: "true"
+
+      - name: Upload Windows
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: OmniLauncher-MC-Windows
-          path: dist/
+          path: |
+            omnilauncher-electron-app/build/output/*.zip
+            omnilauncher-electron-app/build/output/*.exe
+            omnilauncher-electron-app/build/output/*.appx
+            omnilauncher-electron-app/build/output/*.appinstaller
+            omnilauncher-electron-app/build/output/*.sha256
+            omnilauncher-electron-app/build/output/win-unpacked/
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install dependencies
-        run: uv sync --extra build
-
-      - name: Build with PyInstaller
-        run: uv run --with pyinstaller python build.py
-
-      - name: Upload artifact
+      - name: Upload macOS
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: OmniLauncher-MC-MacOS
-          path: dist/
+          path: |
+            omnilauncher-electron-app/build/output/*.dmg
+            omnilauncher-electron-app/build/output/*.zip
+            omnilauncher-electron-app/build/output/*.sha256
+            omnilauncher-electron-app/build/output/mac/
+            omnilauncher-electron-app/build/output/mac-arm64/
 
-  build-ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install dependencies
-        run: uv sync --extra build
-
-      - name: Build with PyInstaller
-        run: uv run --with pyinstaller python build.py
-
-      - name: Upload artifact
+      - name: Upload Linux
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: OmniLauncher-MC-Ubuntu
-          path: dist/
+          path: |
+            omnilauncher-electron-app/build/output/*.AppImage
+            omnilauncher-electron-app/build/output/*.deb
+            omnilauncher-electron-app/build/output/*.rpm
+            omnilauncher-electron-app/build/output/*.tar.xz
+            omnilauncher-electron-app/build/output/*.pacman
+            omnilauncher-electron-app/build/output/*.sha256
+            omnilauncher-electron-app/build/output/linux-unpacked/
+            omnilauncher-electron-app/build/output/linux-arm64-unpacked/
