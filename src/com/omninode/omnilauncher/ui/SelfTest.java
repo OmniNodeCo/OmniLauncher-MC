@@ -163,6 +163,7 @@ public final class SelfTest {
             gameCommandTests();
             runtimeTests();
             authFlowTests();
+            iconTests();
         } catch (Throwable t) {
             failed++;
             System.out.println("FAIL  install pipeline threw: " + t);
@@ -822,6 +823,30 @@ public final class SelfTest {
             MicrosoftAuth.MC_PROFILE_URL = oldProfile;
             Os.setDataDirForTests(null);
         }
+    }
+
+    /* ---------------------------------------------------- icons & version */
+
+    private static void iconTests() throws Exception {
+        eq("0.3.0", GameLauncher.LAUNCHER_VERSION, "version is 0.3.0");
+        Path dir = Files.createTempDirectory("omni-icons");
+        var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
+        Path png = dir.resolve("icon-256.png");
+        eq(true, Files.exists(png), "icon: 256px png written");
+        byte[] pngBytes = Files.readAllBytes(png);
+        eq(true, pngBytes.length > 0
+                && (pngBytes[0] & 0xFF) == 0x89 && pngBytes[1] == 'P' && pngBytes[2] == 'N',
+                "icon: png signature");
+        byte[] ico = Files.readAllBytes(dir.resolve("OmniLauncher.ico"));
+        eq(true, ico.length > 4 && ico[0] == 0 && ico[1] == 0 && ico[2] == 1 && ico[3] == 0,
+                "icon: ico header (type=1)");
+        byte[] icns = Files.readAllBytes(dir.resolve("OmniLauncher.icns"));
+        eq(true, icns.length > 8 && icns[0] == 'i' && icns[1] == 'c' && icns[2] == 'n' && icns[3] == 's',
+                "icon: icns magic");
+        int declared = ((icns[4] & 0xFF) << 24) | ((icns[5] & 0xFF) << 16)
+                | ((icns[6] & 0xFF) << 8) | (icns[7] & 0xFF);
+        eq(icns.length, declared, "icon: icns declared size matches");
+        eq(10, written.size(), "icon: export map size");
     }
 
     /* ------------------------------------------------------------ assert */

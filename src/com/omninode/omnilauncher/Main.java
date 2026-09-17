@@ -1,5 +1,7 @@
 package com.omninode.omnilauncher;
 
+import java.nio.file.Path;
+
 
 import com.omninode.omnilauncher.api.VersionManifest;
 import com.omninode.omnilauncher.core.AccountStore;
@@ -31,6 +33,7 @@ public class Main {
                     System.exit(Preview.run(args));
                     return;
                 }
+                case "--export-icon" -> { System.exit(exportIcon(argOf(args, 1))); return; }
                 case "--install" -> { System.exit(headlessInstall(argOf(args, 1))); return; }
                 case "--launch" -> { System.exit(headlessLaunch(args)); return; }
                 case "--list" -> { System.exit(headlessList()); return; }
@@ -45,6 +48,22 @@ public class Main {
         }
 
         launchGui();
+    }
+
+    private static int exportIcon(String dirArg) {
+        try {
+            if (dirArg == null || dirArg.isBlank()) {
+                System.err.println("Usage: --export-icon <output-dir>");
+                return 2;
+            }
+            var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(Path.of(dirArg));
+            written.forEach((k, p) -> System.out.println("  " + p));
+            System.out.println("Icons written to " + dirArg);
+            return 0;
+        } catch (Exception e) {
+            System.err.println("Icon export failed: " + e.getMessage());
+            return 1;
+        }
     }
 
     private static String argOf(String[] args, int i) {
@@ -63,6 +82,8 @@ public class Main {
                   OmniLauncher --list                print available versions
                   OmniLauncher --preview <out.png> [page] [width] [height]
                                                      render UI preview (headless)
+                  OmniLauncher --export-icon <dir>   write PNG/ICO/ICNS icons
+                                                     (used by scripts/package.sh)
                   OmniLauncher --selftest            run the built-in test suite
                   OmniLauncher --version             print version
                 """.formatted(GameLauncher.LAUNCHER_VERSION));

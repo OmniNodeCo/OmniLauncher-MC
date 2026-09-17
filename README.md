@@ -1,4 +1,4 @@
-# OmniLauncher 2.0
+# OmniLauncher 0.3.0
 
 A **native, dependency-free Minecraft launcher** with a modern custom GUI —
 written entirely in Java. No Electron, no HTML, no Python, no Node, no
@@ -31,6 +31,8 @@ Maven/Gradle: just the JDK.
   - per-version metadata, library + natives classifiers (`${arch}` included)
   - asset indexes with SHA-1 verification
   - official launcher **patch notes / news feed** (`launchercontent.mojang.com`)
+    with disk caching, an explicit loading state, retry buttons and a
+    "cached" indicator when offline
 - **Automatic Java.** Downloads Mojang's matching bundled runtime
   (`java-runtime-*`, per OS/arch, with checksum markers and executable bits)
   for each version on first play — no manual JVM installs. A configured system
@@ -43,6 +45,24 @@ Maven/Gradle: just the JDK.
   assets for legacy versions, version-accurate JVM/game argument construction.
 - **Headless modes.** `--install`, `--launch`, `--preview`, `--selftest` for
   servers, CI and design iteration.
+
+## Native packages (exe / dmg / deb / rpm)
+
+Installers are built with `jpackage` (bundled in any JDK 17+, not a JRE) and
+the launcher's own icon set — rendered from the procedural grass block into
+PNG, Windows `.ico` and macOS `.icns` on the fly:
+
+```bash
+./scripts/package.sh              # best bundle for the current OS
+./scripts/package.sh app-image    # plain runnable folder
+./scripts/package.sh exe          # Windows installer (auto-falls back to msi)
+./scripts/package.sh dmg          # macOS
+./scripts/package.sh deb|rpm      # Linux packages
+```
+
+Bundles land in `build/dist/`. On `v*` tags CI builds **exe (Windows),
+dmg (macOS) and deb+rpm (Linux)** with lint + full test gates and attaches
+them to the GitHub Release.
 
 ## Build & CI
 

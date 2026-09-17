@@ -202,7 +202,10 @@ public class PlayPanel extends JPanel {
     public void onShown() {
         if (VersionManifest.entries().isEmpty()) VersionManifest.loadAsync(this::syncVersionBox, null);
         else syncVersionBox();
-        if (NewsService.items().isEmpty()) NewsService.loadAsync(() -> newsColumn.refresh(), null);
+        if (NewsService.items().isEmpty()) {
+            newsColumn.showLoading();
+            NewsService.loadAsync(() -> newsColumn.refresh(), err -> newsColumn.showError(err));
+        }
         onStateChanged();
     }
 
@@ -245,7 +248,10 @@ public class PlayPanel extends JPanel {
     }
 
     private void refreshNews() {
-        NewsService.loadAsync(() -> newsColumn.refresh(), null);
+        newsColumn.showLoading();
+        NewsService.loadAsync(
+                () -> newsColumn.refresh(),
+                err -> newsColumn.showError(err));
     }
 
     /* --------------------------------------------------------- reactions */
@@ -381,7 +387,37 @@ public class PlayPanel extends JPanel {
             setPreferredSize(new Dimension(372, 100));
         }
 
+        private String error;
+        private boolean loading;
+
+        /** News loaded (or cached content available). */
         void refresh() {
+            error = null;
+            loading = false;
+            rebuild();
+        }
+
+        void showLoading() {
+            if (!NewsService.items().isEmpty()) return; // keep cached cards visible
+            loading = true;
+            error = null;
+            rebuild();
+        }
+
+        /** News fetch failed — surfaces the message and a retry button. */
+        void showError(String message) {
+            if (!NewsService.items().isEmpty()) { rebuild(); return; } // show stale cards
+            error = message == null || message.isBlank() ? "Connection failed" : message;
+            loading = false;
+            rebuild();
+        }
+
+        private void retry() {
+            showLoading();
+            refreshNews();
+        }
+
+        private void rebuild() {
             removeAll();
             var header = javax.swing.Box.createHorizontalBox();
             header.setBorder(BorderFactory.createEmptyBorder(20, 24, 12, 24));
@@ -389,6 +425,13 @@ public class PlayPanel extends JPanel {
             t.setFont(Theme.bold(12.5f));
             t.setForeground(Theme.TEXT);
             header.add(t);
+            if (NewsService.isStaleCache()) {
+                javax.swing.JLabel cached = new javax.swing.JLabel("· cached");
+                cached.setFont(Theme.semi(10f));
+                cached.setForeground(Theme.FAINT);
+                header.add(javax.swing.Box.createHorizontalStrut(6));
+                header.add(cached);
+            }
             header.add(Box.createHorizontalGlue());
             RButton all = new RButton("View all", RButton.Kind.GHOST);
             all.setFont2(Theme.medium(11.5f));
@@ -404,13 +447,28 @@ public class PlayPanel extends JPanel {
                 if (i < count - 1) add(javax.swing.Box.createVerticalStrut(10));
             }
             if (count == 0) {
-                javax.swing.JLabel none = new javax.swing.JLabel(
-                        items.isEmpty() ? "News will appear here." : "Loading news…");
+                javax.swing.JLabel none = new javax.swing.JLabel(" ", javax.swing.SwingConstants.CENTER);
+                none.setAlignmentX(0f);
                 none.setFont(Theme.medium(12.5f));
                 none.setForeground(Theme.FAINT);
-                none.setBorder(BorderFactory.createEmptyBorder(8, 24, 0, 24));
-                none.setAlignmentX(0f);
-                add(none);
+                none.setBorder(BorderFactory.createEmptyBorder(14, 24, 0, 24));
+                if (error != null) {
+                    none.setText("Couldn't load news — " + shorten(error, 60));
+                    none.setForeground(Theme.AMBER);
+                    add(none);
+                    RButton retry = new RButton("Retry", RButton.Kind.NEUTRAL);
+                    retry.setAlignmentX(0f);
+                    retry.setMaximumSize(new Dimension(110, 32));
+                    retry.setBorder(BorderFactory.createEmptyBorder(10, 24, 0, 24));
+                    retry.onClick(this::retry);
+                    add(retry);
+                } else if (loading) {
+                    none.setText("Loading news…");
+                    add(none);
+                } else {
+                    none.setText("No news available.");
+                    add(none);
+                }
             }
             add(Box.createVerticalGlue());
             revalidate();

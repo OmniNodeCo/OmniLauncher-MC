@@ -38,8 +38,8 @@ if command -v jar >/dev/null 2>&1; then
         -C "$OUT/classes" . -C resources .
 else
     echo "!! jar tool not found — creating a runnable zip (launch with: java -cp $OUT/OmniLauncher.jar com.omninode.omnilauncher.Main)"
-    cp resources/fonts/*.ttf "$OUT/classes/fonts_backup/" 2>/dev/null || true
-    (cd "$OUT/classes" && zip -qr ../OmniLauncher.jar .)
+    rm -f "$OUT/OmniLauncher.jar"
+    (cd "$OUT/classes" && zip -qr "../OmniLauncher.jar" .)
     (cd resources && zip -qr "../$OUT/OmniLauncher.jar" .)
 fi
 

@@ -37,7 +37,11 @@ public class NewsService {
 
     private static volatile List<Item> items = List.of();
     private static volatile long loadedAt;
+    private static volatile boolean staleCache;
     private static final long TTL_MS = 30 * 60_000;
+
+    /** True when the displayed news come from the on-disk cache after a failed refresh. */
+    public static boolean isStaleCache() { return staleCache; }
 
     public static void loadAsync(Runnable onSuccess, java.util.function.Consumer<String> onError) {
         long age = System.currentTimeMillis() - loadedAt;
@@ -61,12 +65,20 @@ public class NewsService {
         try {
             byte[] body = Http.get(NEWS_URL);
             Files.write(cache, body);
+            staleCache = false;
         } catch (Exception e) {
             if (!Files.exists(cache)) throw e;
+            staleCache = true;
             Log.warn("Using cached news: " + e.getMessage());
         }
         parse(Files.readString(cache, StandardCharsets.UTF_8));
         loadedAt = System.currentTimeMillis();
+    }
+
+    /** Ignores the TTL and refetches (used by the UI refresh/retry buttons). */
+    public static void forceReload(Runnable onSuccess, java.util.function.Consumer<String> onError) {
+        loadedAt = 0;
+        loadAsync(onSuccess, onError);
     }
 
     public static void parse(String json) {

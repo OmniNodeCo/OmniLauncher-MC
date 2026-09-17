@@ -17,7 +17,7 @@ import com.omninode.omnilauncher.util.Os;
 public class GameLauncher {
 
     public static final String LAUNCHER_NAME = "OmniLauncher";
-    public static final String LAUNCHER_VERSION = "2.0.0";
+    public static final String LAUNCHER_VERSION = "0.3.0";
 
     public record JavaRuntime(Path javaExe, int major) {}
 

@@ -166,7 +166,8 @@ public class SettingsPanel extends JPanel {
         JLabel logo = new JLabel(new javax.swing.ImageIcon(Icons.grassBlock(44)));
         place(about, logo, 0);
         JLabel aboutText = new JLabel("<html><div style='width:560px'>"
-                + "<b>OmniLauncher 2.0</b> — a native, dependency-free Minecraft launcher.<br>"
+                + "<b>OmniLauncher " + GameLauncher.LAUNCHER_VERSION + "</b> — a native, "
+                + "dependency-free Minecraft launcher.<br>"
                 + "Pure Java 17. No Electron, no HTML, no Python. <br><br>"
                 + "<span style='color:#6b7280'>Not an official Minecraft product. "
                 + "Not approved by or associated with Mojang or Microsoft.</span></div></html>");

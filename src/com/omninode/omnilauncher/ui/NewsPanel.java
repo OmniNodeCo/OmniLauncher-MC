@@ -61,6 +61,15 @@ public class NewsPanel extends JPanel {
             public void removeUpdate(javax.swing.event.DocumentEvent e) { rebuildRows(); }
             public void changedUpdate(javax.swing.event.DocumentEvent e) { rebuildRows(); }
         });
+        header.add(Box.createHorizontalStrut(8));
+        RButton reload = new RButton("", RButton.Kind.GHOST);
+        reload.setIcon(Icons.glyph(Icons.Glyph.REFRESH, 14, Theme.DIM));
+        reload.setPreferredSize(new Dimension(36, 36));
+        reload.onClick(() -> {
+            NewsService.forceReload(this::rebuildRows, err -> rebuildRows());
+        });
+        header.add(reload);
+        header.add(Box.createHorizontalStrut(8));
         header.add(search);
         listCard.add(header, BorderLayout.NORTH);
 
@@ -89,7 +98,8 @@ public class NewsPanel extends JPanel {
         String q = search.getText() == null ? "" : search.getText().trim().toLowerCase();
         var items = NewsService.items();
         ((javax.swing.JLabel) ((JPanel) listCard.getComponent(0)).getComponent(1))
-                .setText(items.isEmpty() ? "" : items.size() + " entries");
+                .setText(items.isEmpty() ? ""
+                        : items.size() + " entries" + (NewsService.isStaleCache() ? " · cached" : ""));
         for (NewsService.Item item : items) {
             if (!q.isEmpty() && !item.title().toLowerCase().contains(q)
                     && !item.shortText().toLowerCase().contains(q)) continue;
@@ -97,14 +107,24 @@ public class NewsPanel extends JPanel {
             rows.add(Box.createVerticalStrut(12));
         }
         if (rows.getComponentCount() == 0) {
+            boolean failed = items.isEmpty() && NewsService.items().isEmpty();
             var empty = new javax.swing.JLabel(items.isEmpty()
-                    ? "Could not load news — check your connection."
+                    ? (failed ? "Couldn't load news — check your connection."
+                              : "Loading news…")
                     : "No matching entries.");
             empty.setFont(Theme.medium(13f));
-            empty.setForeground(Theme.FAINT);
+            empty.setForeground(failed ? Theme.AMBER : Theme.FAINT);
             empty.setBorder(BorderFactory.createEmptyBorder(24, 4, 0, 0));
             empty.setAlignmentX(0f);
             rows.add(empty);
+            if (failed) {
+                RButton retry = new RButton("Retry", RButton.Kind.NEUTRAL);
+                retry.setAlignmentX(0f);
+                retry.setMaximumSize(new Dimension(110, 34));
+                retry.setBorder(BorderFactory.createEmptyBorder(12, 4, 0, 0));
+                retry.onClick(() -> NewsService.forceReload(this::rebuildRows, err -> rebuildRows()));
+                rows.add(retry);
+            }
         }
         rows.revalidate();
         rows.repaint();
