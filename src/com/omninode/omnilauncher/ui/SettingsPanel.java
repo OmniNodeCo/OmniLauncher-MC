@@ -1,10 +1,8 @@
 package com.omninode.omnilauncher.ui;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -13,7 +11,6 @@ import java.io.File;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -34,8 +31,6 @@ public class SettingsPanel extends JPanel {
 
     private final Settings s = Settings.get();
     private final Timer saveDebounce;
-    private final RButton[] navButtons = new RButton[3];
-    private int navIndex;
 
     public SettingsPanel(Runnable openAccounts) {
         setLayout(new BorderLayout());

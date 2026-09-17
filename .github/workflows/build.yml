@@ -5,8 +5,16 @@ on:
     branches: ['**']
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Compile, lint & package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,16 +24,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build
+      - name: Static analysis (compiler errors & warnings become PR annotations)
+        run: ./scripts/lint.sh
+
+      - name: Package
         run: ./scripts/build.sh
 
-      - name: Self-test (includes live HTTP install/runtime pipeline)
-        run: java -jar build/OmniLauncher.jar --selftest
+      - name: "Smoke: headless UI render"
+        run: java -jar build/OmniLauncher.jar --preview build/ui-smoke.png play
 
-      - name: Headless UI smoke render
-        run: java -jar build/OmniLauncher.jar --preview preview.png play
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
         with:
           name: OmniLauncher-jar
           path: build/OmniLauncher.jar
+          retention-days: 14

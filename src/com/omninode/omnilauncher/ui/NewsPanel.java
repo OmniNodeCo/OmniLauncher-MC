@@ -1,7 +1,6 @@
 package com.omninode.omnilauncher.ui;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
@@ -11,8 +10,6 @@ import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -21,7 +18,6 @@ import javax.swing.JComponent;
 import javax.swing.JEditorPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
 
 import com.omninode.omnilauncher.api.NewsService;
 import com.omninode.omnilauncher.ui.components.HoverCard;
@@ -36,7 +32,6 @@ public class NewsPanel extends JPanel {
     private final JPanel detail = new JPanel(new BorderLayout());
     private final RTextField search = new RTextField("Search notes…");
     private final java.awt.CardLayout cards = new java.awt.CardLayout();
-    private NewsService.Item currentDetail;
 
     public NewsPanel() {
         setLayout(new java.awt.CardLayout() == null ? null : cards);

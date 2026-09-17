@@ -57,7 +57,6 @@ public class NavRail extends JComponent {
 
     /** 0..2 nav items, 3 = avatar zone, -1 elsewhere. */
     private int zoneAt(int x, int y) {
-        int cx = WIDTH / 2;
         if (x < 8 || x > WIDTH - 8) return -1;
         if (y >= 52 && y <= 100) return 0;
         if (y >= 112 && y <= 160) return 1;

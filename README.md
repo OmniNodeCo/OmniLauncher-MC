@@ -6,6 +6,7 @@ Maven/Gradle: just the JDK.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Build](https://github.com/OmniNodeCo/OmniLauncher-MC/actions/workflows/build.yml/badge.svg)
+![Test](https://github.com/OmniNodeCo/OmniLauncher-MC/actions/workflows/test.yml/badge.svg)
 
 | Play | Patch notes | Accounts |
 |---|---|---|
@@ -43,9 +44,20 @@ Maven/Gradle: just the JDK.
 - **Headless modes.** `--install`, `--launch`, `--preview`, `--selftest` for
   servers, CI and design iteration.
 
-## Build
+## Build & CI
 
 Requires **JDK 17+** (any vendor). No other tooling.
+
+Three GitHub Actions workflows keep the code honest:
+
+- **Build** (`build.yml`) — static analysis pass where every compiler
+  error/warning becomes an inline PR annotation (`scripts/lint.sh`), then
+  packages the jar as an artifact.
+- **Test** (`test.yml`) — runs the full `--selftest` suite (failing checks are
+  annotated on the PR) plus a headless-modes job that renders all seven UI
+  pages on a display-less runner.
+- **Release** (`release.yml`) — on `v*` tags: lint → build → test gates, then
+  publishes the jar to a GitHub Release with generated notes.
 
 ```bash
 ./scripts/build.sh                      # → build/OmniLauncher.jar

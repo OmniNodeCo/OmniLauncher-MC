@@ -1,11 +1,9 @@
 package com.omninode.omnilauncher;
 
-import java.nio.file.Path;
 
 import com.omninode.omnilauncher.api.VersionManifest;
 import com.omninode.omnilauncher.core.AccountStore;
 import com.omninode.omnilauncher.core.GameLauncher;
-import com.omninode.omnilauncher.core.LaunchController;
 import com.omninode.omnilauncher.core.Settings;
 import com.omninode.omnilauncher.core.VersionInstaller;
 import com.omninode.omnilauncher.model.Account;
@@ -35,6 +33,7 @@ public class Main {
                 }
                 case "--install" -> { System.exit(headlessInstall(argOf(args, 1))); return; }
                 case "--launch" -> { System.exit(headlessLaunch(args)); return; }
+                case "--list" -> { System.exit(headlessList()); return; }
                 case "--help", "-h" -> { printHelp(); return; }
                 default -> {
                     System.err.println("Unknown option: " + args[0]);

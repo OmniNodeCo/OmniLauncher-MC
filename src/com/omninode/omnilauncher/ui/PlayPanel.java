@@ -194,7 +194,7 @@ public class PlayPanel extends JPanel {
                 AppState.get().setStatus("Could not load versions — offline?"));
         refreshNews();
         if (!VersionManifest.entries().isEmpty()) syncVersionBox();
-        if (!NewsService.items().isEmpty()) newsColumn.refresh(null);
+        if (!NewsService.items().isEmpty()) newsColumn.refresh();
         onStateChanged();
     }
 
@@ -202,7 +202,7 @@ public class PlayPanel extends JPanel {
     public void onShown() {
         if (VersionManifest.entries().isEmpty()) VersionManifest.loadAsync(this::syncVersionBox, null);
         else syncVersionBox();
-        if (NewsService.items().isEmpty()) NewsService.loadAsync(() -> newsColumn.refresh(null), null);
+        if (NewsService.items().isEmpty()) NewsService.loadAsync(() -> newsColumn.refresh(), null);
         onStateChanged();
     }
 
@@ -215,6 +215,7 @@ public class PlayPanel extends JPanel {
         return l;
     }
 
+    @SuppressWarnings("unused") // ActionListener signature
     private void onPlayClicked(ActionEvent e) {
         LaunchController.get().play(currentEntry());
     }
@@ -244,7 +245,7 @@ public class PlayPanel extends JPanel {
     }
 
     private void refreshNews() {
-        NewsService.loadAsync(() -> newsColumn.refresh(null), null);
+        NewsService.loadAsync(() -> newsColumn.refresh(), null);
     }
 
     /* --------------------------------------------------------- reactions */
@@ -263,6 +264,7 @@ public class PlayPanel extends JPanel {
         playButton.repaint();
     }
 
+    @SuppressWarnings("unused") // Timer callback signature
     private void pumpOutput(ActionEvent e) {
         if (!outputOpen && outputDrawer.getWidth() == 0) {
             synchronized (pendingOutput) {
@@ -379,7 +381,7 @@ public class PlayPanel extends JPanel {
             setPreferredSize(new Dimension(372, 100));
         }
 
-        void refresh(NewsService.Item highlight) {
+        void refresh() {
             removeAll();
             var header = javax.swing.Box.createHorizontalBox();
             header.setBorder(BorderFactory.createEmptyBorder(20, 24, 12, 24));
@@ -398,7 +400,7 @@ public class PlayPanel extends JPanel {
             int count = Math.min(3, items.size());
             for (int i = 0; i < count; i++) {
                 NewsService.Item item = items.get(i);
-                add(makeCard(item, false));
+                add(makeCard(item));
                 if (i < count - 1) add(javax.swing.Box.createVerticalStrut(10));
             }
             if (count == 0) {
@@ -415,7 +417,7 @@ public class PlayPanel extends JPanel {
             repaint();
         }
 
-        HoverCard makeCard(NewsService.Item item, boolean wide) {
+        HoverCard makeCard(NewsService.Item item) {
             HoverCard card = new HoverCard();
             card.setLayout(new BorderLayout());
             card.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 14));

@@ -50,7 +50,7 @@ public class LauncherShell extends JPanel {
         navRail.setOnAccounts(this::openAccounts);
         titleBar.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mousePressed(java.awt.event.MouseEvent e) {
-                titleBar.handleClick(titleBar, e.getX(), e.getY());
+                titleBar.handleClick(e.getX(), e.getY());
             }
         });
 

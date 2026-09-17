@@ -1,7 +1,6 @@
 package com.omninode.omnilauncher.ui;
 
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -114,7 +113,7 @@ public class TitleBar extends JComponent {
     @Override protected void paintChildren(Graphics g) { super.paintChildren(g); }
 
     /** Routes clicks on the control zones (called from a click listener installed by the shell). */
-    boolean handleClick(Component source, int x, int y) {
+    boolean handleClick(int x, int y) {
         int c = controlAt(new Point(x, y));
         if (c == 0) frame.setState(java.awt.Frame.ICONIFIED);
         else if (c == 1) toggleMaximize();

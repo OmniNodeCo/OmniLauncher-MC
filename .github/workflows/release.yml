@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   release:
+    name: Test, build & publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +19,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Static analysis gate
+        run: ./scripts/lint.sh
+
       - name: Build
         run: ./scripts/build.sh
 
-      - name: Self-test
-        run: java -jar build/OmniLauncher.jar --selftest
+      - name: Test gate
+        run: |
+          java -jar build/OmniLauncher.jar --selftest | tee build/selftest.log
+          grep -q "0 failed" build/selftest.log
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

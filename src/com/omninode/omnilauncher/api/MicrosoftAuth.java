@@ -175,7 +175,8 @@ public class MicrosoftAuth {
                 }
             }
         }
-        return Account.microsoft(name, id, mcToken, refreshToken,
-                System.currentTimeMillis() + mcExpiresIn * 1000 - 60_000, skinUrl);
+        long expiresAt = System.currentTimeMillis()
+                + Math.min(mcExpiresIn, expiresIn) * 1000 - 60_000;
+        return Account.microsoft(name, id, mcToken, refreshToken, expiresAt, skinUrl);
     }
 }

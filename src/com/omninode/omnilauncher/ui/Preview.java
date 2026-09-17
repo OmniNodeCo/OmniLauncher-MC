@@ -7,11 +7,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import javax.imageio.ImageIO;
-import javax.swing.JPanel;
 
 import com.omninode.omnilauncher.api.NewsService;
 import com.omninode.omnilauncher.api.VersionManifest;
-import com.omninode.omnilauncher.core.OsTestUtil;
 import com.omninode.omnilauncher.util.Os;
 
 /**

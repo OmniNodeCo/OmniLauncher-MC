@@ -23,8 +23,6 @@ public class RButton extends JComponent {
 
     public enum Kind { PRIMARY, NEUTRAL, GHOST, DANGER, SUCCESS }
 
-    private static final List<RButton> HOVERED = new ArrayList<>();
-
     private String text;
     private Image icon;
     private Kind kind = Kind.NEUTRAL;

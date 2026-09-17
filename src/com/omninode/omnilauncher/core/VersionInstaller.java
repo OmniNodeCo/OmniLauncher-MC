@@ -160,6 +160,7 @@ public class VersionInstaller {
 
     private static VersionJson fetchVersionJson(VersionManifest.Entry entry, Path versionDir,
                                                 Http.CancelToken cancel) throws Exception {
+        if (cancel != null && cancel.cancelled()) throw new IOException("Cancelled");
         Path jsonFile = versionDir.resolve(entry.id() + ".json");
         if (Files.exists(jsonFile)) {
             if (entry.sha1() == null || entry.sha1().isBlank()
