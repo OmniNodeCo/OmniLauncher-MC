@@ -66,6 +66,7 @@ jobs:
       - name: Package native installer
         run: |
           set -o pipefail
+          mkdir -p build
           bash -x ./scripts/package.sh ${{ matrix.type }} 2>&1 | tee build/pkg.log
 
       - name: Report packaging failure
