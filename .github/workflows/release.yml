@@ -50,6 +50,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # jpackage needs WiX 3 (candle/light) on PATH to build exe/msi bundles
+      - name: Install WiX toolset
+        if: matrix.type == 'exe'
+        shell: pwsh
+        run: |
+          choco install wixtoolset --no-progress -y
+          Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\WiX Toolset v3.14\bin'
+
+      # jpackage needs rpmbuild for --type rpm
+      - name: Install rpm tooling
+        if: matrix.type == 'rpm'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq rpm
+
       - name: Package native installer
         run: bash ./scripts/package.sh ${{ matrix.type }}
         shell: bash
@@ -75,6 +88,8 @@ jobs:
 
       - name: Attach bundles to the release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: dist/**
           generate_release_notes: true
