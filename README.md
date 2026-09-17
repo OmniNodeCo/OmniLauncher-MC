@@ -5,6 +5,7 @@ written entirely in Java. No Electron, no HTML, no Python, no Node, no
 Maven/Gradle: just the JDK.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Build](https://github.com/OmniNodeCo/OmniLauncher-MC/actions/workflows/build.yml/badge.svg)
 
 | Play | Patch notes | Accounts |
 |---|---|---|
@@ -29,6 +30,10 @@ Maven/Gradle: just the JDK.
   - per-version metadata, library + natives classifiers (`${arch}` included)
   - asset indexes with SHA-1 verification
   - official launcher **patch notes / news feed** (`launchercontent.mojang.com`)
+- **Automatic Java.** Downloads Mojang's matching bundled runtime
+  (`java-runtime-*`, per OS/arch, with checksum markers and executable bits)
+  for each version on first play — no manual JVM installs. A configured system
+  Java or explicit path still takes precedence.
 - **Accounts.** Microsoft sign-in via the OAuth **device-code flow**
   (XBL → XSTS → minecraftservices) with automatic token refresh, plus offline
   accounts. Encrypted-at-rest tokens are sandboxed to your OS user profile.
@@ -52,6 +57,7 @@ java -jar build/OmniLauncher.jar
 ```bash
 java -jar build/OmniLauncher.jar                 # launcher window
 java -jar build/OmniLauncher.jar --selftest      # built-in test suite
+java -jar build/OmniLauncher.jar --list
 java -jar build/OmniLauncher.jar --install 1.21.9
 java -jar build/OmniLauncher.jar --launch 1.21.9 --name Steve
 java -jar build/OmniLauncher.jar --preview ui.png settings
@@ -89,6 +95,7 @@ src/com/omninode/omnilauncher/
 │   ├── VersionInstaller client jar / libraries / assets / natives
 │   ├── DownloadEngine   concurrent, verified, cancellable downloads
 │   ├── GameLauncher     builds the java command, streams game output
+│   ├── RuntimeManager   Mojang java-runtime-* auto-download per version
 │   ├── LaunchController play flow state machine
 │   ├── Settings, AccountStore, Os, Log
 ├── model/               Account

@@ -26,7 +26,8 @@ public class Settings {
     }
 
     /* Java */
-    public String javaPath = "";                 // empty = auto-detect
+    public String javaPath = "";                 // empty = auto-detect / Mojang runtime
+    public boolean autoDownloadJava = true;      // fetch Mojang java-runtime when needed
     public int memoryMb = 2048;                  // -Xmx
     public String extraJvmArgs = "";
 
@@ -66,6 +67,7 @@ public class Settings {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("version", 2);
         m.put("javaPath", javaPath);
+        m.put("autoDownloadJava", autoDownloadJava);
         m.put("memoryMb", memoryMb);
         m.put("extraJvmArgs", extraJvmArgs);
         m.put("gameDir", gameDir);
@@ -88,6 +90,7 @@ public class Settings {
 
     public void fromMap(Map<String, Object> m) {
         javaPath = Json.str(m, "javaPath", javaPath);
+        autoDownloadJava = Json.bool(m, "autoDownloadJava", autoDownloadJava);
         memoryMb = (int) Json.num(m, "memoryMb", memoryMb);
         extraJvmArgs = Json.str(m, "extraJvmArgs", extraJvmArgs);
         gameDir = Json.str(m, "gameDir", gameDir);

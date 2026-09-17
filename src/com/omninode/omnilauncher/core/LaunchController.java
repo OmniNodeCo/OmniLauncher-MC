@@ -64,10 +64,24 @@ public class LaunchController {
                     st.set(AppState.Phase.INSTALLING, status);
                 }, (frac) -> st.setProgress(frac), token);
 
+                // resolve (or download) the right Java runtime
+                GameLauncher.JavaRuntime rt;
+                try {
+                    rt = GameLauncher.resolveRuntime(installed.json(),
+                            m -> st.set(AppState.Phase.INSTALLING, m),
+                            f -> st.setProgress(f),
+                            token);
+                } catch (Exception e) {
+                    Log.error("Java setup failed", e);
+                    st.set(AppState.Phase.ERROR,
+                            e.getMessage() == null ? "Java setup failed" : e.getMessage());
+                    return;
+                }
+
                 // launch
                 st.set(AppState.Phase.LAUNCHING, "Launching Minecraft " + entry.id() + "…");
                 Account acc = account;
-                GameLauncher.launch(installed, acc, new GameLauncher.RunListener() {
+                GameLauncher.launch(installed, acc, rt, new GameLauncher.RunListener() {
                     @Override public void started(Process p) {
                         st.setGameProcess(p, entry.id());
                         st.set(AppState.Phase.RUNNING, "Minecraft " + entry.id() + " is running");

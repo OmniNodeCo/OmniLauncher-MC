@@ -61,6 +61,7 @@ public class Main {
                   OmniLauncher --install <version>   install a version, headless
                   OmniLauncher --launch <version> [--name <player>]
                                                      install & launch, headless
+                  OmniLauncher --list                print available versions
                   OmniLauncher --preview <out.png> [page] [width] [height]
                                                      render UI preview (headless)
                   OmniLauncher --selftest            run the built-in test suite
@@ -99,6 +100,22 @@ public class Main {
             return 0;
         } catch (Exception e) {
             System.err.println("Install failed: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private static int headlessList() {
+        try {
+            VersionManifest.loadBlocking();
+            for (var e : VersionManifest.visibleEntries(
+                    Settings.get().showSnapshots, Settings.get().showHistorical)) {
+                String date = e.releaseTime();
+                if (date.length() >= 10) date = date.substring(0, 10);
+                System.out.println(e.id() + "\t" + e.type() + "\t" + date);
+            }
+            return 0;
+        } catch (Exception e) {
+            System.err.println("Could not load the version list: " + e.getMessage());
             return 1;
         }
     }

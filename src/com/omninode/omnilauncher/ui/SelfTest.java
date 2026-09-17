@@ -13,6 +13,7 @@ import java.util.zip.ZipOutputStream;
 import com.omninode.omnilauncher.api.MicrosoftAuth;
 import com.omninode.omnilauncher.api.NewsService;
 import com.omninode.omnilauncher.api.VersionManifest;
+import com.omninode.omnilauncher.core.RuntimeManager;
 import com.omninode.omnilauncher.core.Settings;
 import com.omninode.omnilauncher.core.VersionInstaller;
 import com.omninode.omnilauncher.core.VersionJson;
@@ -160,6 +161,7 @@ public final class SelfTest {
         try {
             installPipelineTests();
             gameCommandTests();
+            runtimeTests();
         } catch (Throwable t) {
             failed++;
             System.out.println("FAIL  install pipeline threw: " + t);
@@ -572,6 +574,116 @@ public final class SelfTest {
 
     private static String sha1(byte[] data) throws Exception {
         return Http.hex(java.security.MessageDigest.getInstance("SHA-1").digest(data));
+    }
+
+    /* ----------------------------------------------------- Mojang runtime */
+
+    private static void runtimeTests() throws Exception {
+        Path sandbox = Files.createTempDirectory("omni-rt");
+        Os.setDataDirForTests(sandbox);
+        Path www = Files.createDirectories(sandbox.resolve("rwww"));
+
+        byte[] javaBin = "#!/bin/sh\necho fake-runtime-java\n".getBytes();
+        byte[] rtJar = "runtime-jar-bytes".getBytes();
+        String hBin = sha1(javaBin), hJar = sha1(rtJar);
+        Files.write(www.resolve("bin-java"), javaBin);
+        Files.write(www.resolve("rt-jar"), rtJar);
+
+        var server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        var hits = new java.util.concurrent.ConcurrentHashMap<String, Integer>();
+        server.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            if (path.startsWith("/")) path = path.substring(1);
+            hits.merge(path, 1, Integer::sum);
+            byte[] body;
+            try {
+                body = Files.readAllBytes(www.resolve(path));
+            } catch (Exception e) {
+                exchange.sendResponseHeaders(404, -1);
+                return;
+            }
+            exchange.sendResponseHeaders(200, body.length);
+            try (var out = exchange.getResponseBody()) { out.write(body); }
+        });
+        server.start();
+        String base = "http://127.0.0.1:" + server.getAddress().getPort();
+
+        String manifestJson = """
+            {
+              "files": {
+                "bin/java":   { "type": "file", "executable": true,
+                                "downloads": { "raw": { "url": "%B%/bin-java", "sha1": "%HB%", "size": %SB% } } },
+                "lib/rt.jar": { "type": "file", "executable": false,
+                                "downloads": { "raw": { "url": "%B%/rt-jar", "sha1": "%HR%", "size": %SR% } } },
+                "conf":       { "type": "directory" }
+              }
+            }
+            """
+                .replace("%B%", base)
+                .replace("%HB%", hBin).replace("%SB%", String.valueOf(javaBin.length))
+                .replace("%HR%", hJar).replace("%SR%", String.valueOf(rtJar.length));
+        byte[] manifestBytes = manifestJson.getBytes();
+        Files.write(www.resolve("rt-manifest.json"), manifestBytes);
+        String checksum = sha1(manifestBytes);
+
+        // products list: decoy first, jre_local second (must be preferred)
+        String productsJson = """
+            [
+              { "component": "java-runtime-test", "version": "17.0.1", "availability": "jre",
+                "manifest": { "type": "file", "url": "http://decoy.invalid/manifest.json" } },
+              { "component": "java-runtime-test", "version": "17.0.9", "availability": "jre_local",
+                "checksum": "%CK%",
+                "manifest": { "type": "file", "url": "%U%/rt-manifest.json" } }
+            ]
+            """
+                .replace("%CK%", checksum)
+                .replace("%U%", base);
+        RuntimeManager.productsBaseUrl = base + "/products";
+
+        try {
+            // product parsing: prefers jre_local over jre
+            var product = RuntimeManager.parseProducts(productsJson, "java-runtime-test");
+            eq("17.0.9", product.version(), "rt: prefers jre_local entry");
+            eq(base + "/rt-manifest.json", product.manifestUrl(), "rt: manifest url");
+            eq(checksum, product.checksum(), "rt: checksum passthrough");
+            eq(null, RuntimeManager.parseProducts("[]", "x"), "rt: empty products → null");
+            eq("17", String.valueOf(RuntimeManager.majorOfVersion("17.0.9")), "rt: version major parse");
+
+            eq(true, RuntimeManager.productsUrl("java-runtime-gamma",
+                    Os.of(Os.Family.LINUX, "x64")).endsWith("/java-runtime-gamma/linux/x64/all.json"),
+                    "rt: products url shape");
+            eq(true, RuntimeManager.productsUrl("java-runtime-gamma",
+                    Os.of(Os.Family.WINDOWS, "arm64")).contains("/windows/x64/"),
+                    "rt: windows arm falls back to x64");
+
+            // install through the live local server
+            RuntimeManager.ensure(product, s -> {}, f -> {}, new Http.CancelToken());
+            Path javaExe = RuntimeManager.javaExecutable("java-runtime-test");
+            eq(true, Files.exists(javaExe), "rt: bin/java downloaded");
+            eq(true, Files.isExecutable(javaExe), "rt: executable bit set");
+            eq(true, Files.exists(RuntimeManager.runtimeDir("java-runtime-test").resolve("lib/rt.jar")),
+                    "rt: lib/rt.jar downloaded");
+            eq(hJar, Http.sha1(RuntimeManager.runtimeDir("java-runtime-test").resolve("lib/rt.jar")),
+                    "rt: runtime file sha1 verified");
+            eq(true, Files.exists(RuntimeManager.runtimeDir("java-runtime-test")
+                    .resolve(".done-" + checksum)), "rt: checksum marker");
+            var handle = RuntimeManager.javaFor("java-runtime-test", 17);
+            eq(true, handle != null && handle.major() == 17, "rt: javaFor handle");
+
+            // second ensure: fast path, no re-downloads
+            int hitsBefore = hits.getOrDefault("bin-java", 0);
+            RuntimeManager.ensure(product, s -> {}, f -> {}, new Http.CancelToken());
+            eq(hitsBefore, hits.getOrDefault("bin-java", 0), "rt: installed runtime not re-downloaded");
+
+            // component plumbing through version metadata
+            eq("java-runtime-gamma", VersionJson.parse(VERSION_JSON).javaComponent,
+                    "rt: version json component");
+        } finally {
+            server.stop(0);
+            RuntimeManager.productsBaseUrl = "https://piston-meta.mojang.com/v1/products/java-runtime";
+            Os.setDataDirForTests(null);
+        }
     }
 
     /* ------------------------------------------------------------ assert */

@@ -86,6 +86,8 @@ public class VersionJson {
     public List<ArgEntry> gameArgs = new ArrayList<>();
     public String legacyMinecraftArguments;
     public int javaMajor;
+    /** Mojang bundled JVM component, e.g. "java-runtime-gamma" (null on ancient versions). */
+    public String javaComponent;
 
     public boolean isModern() { return legacyMinecraftArguments == null; }
 
@@ -119,7 +121,10 @@ public class VersionJson {
             }
         }
         var javaVersion = Json.map(root, "javaVersion");
-        if (javaVersion != null) v.javaMajor = (int) Json.num(javaVersion, "majorVersion", 0);
+        if (javaVersion != null) {
+            v.javaMajor = (int) Json.num(javaVersion, "majorVersion", 0);
+            v.javaComponent = Json.str(javaVersion, "component", null);
+        }
 
         for (Object o : Json.arr(root, "libraries")) {
             Library lib = parseLibrary(o);

@@ -102,21 +102,81 @@ public class GameLauncher {
         return cmd;
     }
 
+    /**
+     * Resolves the Java runtime to use for a version:
+     * explicit path → Mojang bundled runtime (auto-download) → system Java.
+     * Throws IllegalStateException with a friendly message on failure.
+     */
+    public static JavaRuntime resolveRuntime(VersionJson v,
+                                             java.util.function.Consumer<String> status,
+                                             java.util.function.Consumer<Float> progress,
+                                             com.omninode.omnilauncher.util.Http.CancelToken cancel)
+            throws Exception {
+        int required = v.javaMajor > 0 ? v.javaMajor : 8;
+        Settings s = Settings.get();
+
+        // explicit user override wins
+        if (s.javaPath != null && !s.javaPath.isBlank()) {
+            JavaRuntime configured = findJava();
+            if (configured != null) {
+                if (configured.major() >= required) return configured;
+                throw new IllegalStateException("The configured Java is version " + configured.major()
+                        + " but Minecraft " + v.id + " needs Java " + required + ".");
+            }
+        }
+
+        // Mojang bundled runtime
+        if (s.autoDownloadJava && v.javaComponent != null && !v.javaComponent.isBlank()) {
+            try {
+                RuntimeManager.Product p = RuntimeManager.resolve(v.javaComponent);
+                RuntimeManager.ensure(p, status, progress, cancel);
+                JavaRuntime rt = RuntimeManager.javaFor(v.javaComponent,
+                        Math.max(required, RuntimeManager.majorOfVersion(p.version())));
+                if (rt != null) {
+                    Log.info("Using Mojang runtime " + v.javaComponent + " (" + p.version() + ")");
+                    return rt;
+                }
+            } catch (Exception e) {
+                if (cancel != null && cancel.cancelled()) throw e;
+                Log.warn("Mojang runtime unavailable, falling back to system Java: " + e.getMessage());
+            }
+        }
+
+        JavaRuntime sys = findJava();
+        if (sys == null)
+            throw new IllegalStateException("No Java runtime found. Install Java " + required
+                    + " or turn on automatic Java download in Settings → Java.");
+        if (sys.major() > 0 && sys.major() < required)
+            throw new IllegalStateException("Minecraft " + v.id + " requires Java " + required
+                    + " but the system Java is " + sys.major()
+                    + ". Enable automatic Java download in Settings → Java.");
+        return sys;
+    }
+
     public static Process launch(VersionInstaller.InstalledVersion v, Account account, RunListener listener)
             throws IOException {
-        JavaRuntime rt = findJava();
+        JavaRuntime rt;
+        try {
+            rt = resolveRuntime(v.json(), m -> Log.info(m), f -> {}, null);
+        } catch (Exception e) {
+            listener.failed(e.getMessage() == null ? "Java setup failed" : e.getMessage());
+            return null;
+        }
+        return launch(v, account, rt, listener);
+    }
+
+    public static Process launch(VersionInstaller.InstalledVersion v, Account account,
+                                 JavaRuntime rt, RunListener listener) throws IOException {
         if (rt == null) {
-            listener.failed("No Java runtime found. Install Java and set its path in Settings → Java.");
+            listener.failed("No Java runtime available.");
             return null;
         }
         int required = v.json().javaMajor > 0 ? v.json().javaMajor : 8;
         if (rt.major() > 0 && rt.major() < required) {
             listener.failed("Minecraft " + v.json().id + " requires Java " + required
-                    + " but the configured runtime is Java " + rt.major()
-                    + ". Install Java " + required + " and select it in Settings → Java.");
+                    + " but the selected runtime is Java " + rt.major() + ".");
             return null;
         }
-
         List<String> cmd = buildCommand(v, account, rt);
         Path gameDir = Settings.get().resolveGameDir();
         Files.createDirectories(gameDir);

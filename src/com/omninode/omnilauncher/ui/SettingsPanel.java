@@ -93,6 +93,9 @@ public class SettingsPanel extends JPanel {
         addRow(javaCard, 6, "Extra JVM arguments", "Added before the game arguments (quotes supported).");
         RTextField jvmArgs = text(javaCard, s.extraJvmArgs, 7);
         jvmArgs.getDocument().addDocumentListener(simple(() -> { s.extraJvmArgs = jvmArgs.getText(); touch(); }));
+        addToggle(javaCard, 8, "Download the right Java automatically",
+                "Fetch Mojang's matching runtime (java-runtime-*) for each version on first play.",
+                s.autoDownloadJava, v -> s.autoDownloadJava = v);
 
         // ---------------------------------------------------- Game section
         column.add(Box.createVerticalStrut(14));
