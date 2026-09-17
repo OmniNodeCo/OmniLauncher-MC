@@ -1,73 +1,125 @@
-# OmniLauncher-MC
+# OmniLauncher 2.0
 
-A modern, open-source Minecraft launcher for Windows, macOS, and Linux.
+A **native, dependency-free Minecraft launcher** with a modern custom GUI —
+written entirely in Java. No Electron, no HTML, no Python, no Node, no
+Maven/Gradle: just the JDK.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Electron](https://img.shields.io/badge/ui-Electron%20%2B%20Vue-42b883)
-![Node](https://img.shields.io/badge/node-22%2B-brightgreen)
+
+| Play | Patch notes | Accounts |
+|---|---|---|
+| ![Play page](docs/screenshots/play.png) | ![Patch notes](docs/screenshots/news.png) | ![Accounts](docs/screenshots/accounts.png) |
+
+*More views: [version picker](docs/screenshots/versions.png) ·
+[installing](docs/screenshots/installing.png) ·
+[settings](docs/screenshots/settings.png) ·
+[article reader](docs/screenshots/detail.png)*
 
 **Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.**
 
-## Features
+## Highlights
 
-- Download and launch Minecraft, Forge, Fabric, Quilt, NeoForge, OptiFine, and JVM runtimes
-- Fast concurrent downloads with connection reuse
-- Multiple isolated instances (mods, versions, and launch settings)
-- Resource linking so mods are not copied everywhere
-- Built-in CurseForge and Modrinth browsing, install, and modpack import/export
-- Microsoft, Mojang Yggdrasil, and third-party auth servers
-- Peer-to-peer multiplayer over LAN-style connections
-- Appearance, Java, and launch settings with a dark UI
+- **Pure Java 17.** The entire launcher — UI, JSON, HTTP, auth, downloads — is
+  ~7,000 lines of JDK-only code. Zero third-party dependencies.
+- **Custom-painted GUI.** Every control (buttons, sliders, toggles, combo box,
+  scrollbars, window chrome) is drawn with Java2D in a Minecraft-launcher-style
+  dark theme, with Montserrat typography.
+- **Real Mojang API integration.**
+  - `version_manifest_v2` with ETag-cached refresh (releases, snapshots, betas)
+  - per-version metadata, library + natives classifiers (`${arch}` included)
+  - asset indexes with SHA-1 verification
+  - official launcher **patch notes / news feed** (`launchercontent.mojang.com`)
+- **Accounts.** Microsoft sign-in via the OAuth **device-code flow**
+  (XBL → XSTS → minecraftservices) with automatic token refresh, plus offline
+  accounts. Encrypted-at-rest tokens are sandboxed to your OS user profile.
+- **Install & launch engine.** Concurrent downloader (configurable threads),
+  `.part` + atomic move, hash/size verification, natives extraction, virtual
+  assets for legacy versions, version-accurate JVM/game argument construction.
+- **Headless modes.** `--install`, `--launch`, `--preview`, `--selftest` for
+  servers, CI and design iteration.
 
-## Install
+## Build
 
-Releases: [github.com/OmniNodeCo/OmniLauncher-MC/releases](https://github.com/OmniNodeCo/OmniLauncher-MC/releases)
-
-Data is stored under:
-
-- Windows: `%APPDATA%\OmniLauncher-MC`
-- macOS / Linux: `~/Library/Application Support/OmniLauncher-MC` or `~/.config` / app data as provided by Electron
-
-## Develop
-
-Requires **Node.js 22.16+** and **pnpm 11**.
-
-```bash
-pnpm install
-pnpm dev:renderer   # UI (Vite)
-pnpm dev:main       # Electron main process
-```
-
-Build:
+Requires **JDK 17+** (any vendor). No other tooling.
 
 ```bash
-pnpm build:renderer
-pnpm build
+./scripts/build.sh                      # → build/OmniLauncher.jar
+java -jar build/OmniLauncher.jar
 ```
 
-Tests:
+## Run
 
 ```bash
-pnpm test
-pnpm check
+java -jar build/OmniLauncher.jar                 # launcher window
+java -jar build/OmniLauncher.jar --selftest      # built-in test suite
+java -jar build/OmniLauncher.jar --install 1.21.9
+java -jar build/OmniLauncher.jar --launch 1.21.9 --name Steve
+java -jar build/OmniLauncher.jar --preview ui.png settings
 ```
 
-Workspace layout:
+The game installs into your OS data directory (`%APPDATA%/OmniLauncher`,
+`~/Library/Application Support/OmniLauncher`, or `~/.config/omnilauncher`);
+worlds and saves go to your normal `.minecraft`.
 
-| Path | Role |
-| --- | --- |
-| `omnilauncher-electron-app` | Electron shell, packaging |
-| `omnilauncher-ui` | Vue UI |
-| `omnilauncher-runtime` | Launcher services |
-| `omnilauncher-runtime-api` | Shared API types |
-| `packages/*` | Minecraft libraries |
+## Microsoft sign-in (optional)
+
+Microsoft accounts use Azure "device code" sign-in. To enable it:
+
+1. Create an app at [Azure Portal → App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+   (“Personal Microsoft accounts” audience, no redirect URI needed).
+2. Enable **Allow public client flows**.
+3. Copy the *Application (client) ID* into **Settings → Accounts & Downloads**
+   in the launcher, then use **Manage accounts → Add Microsoft account**.
+4. A code appears in the launcher; enter it at **microsoft.com/link** in your
+   browser and sign in.
+
+Without this you can still add offline accounts and play singleplayer.
+
+## Architecture
+
+```
+src/com/omninode/omnilauncher/
+├── Main.java            entry point + headless CLI modes
+├── api/                 external services
+│   ├── VersionManifest  piston-meta manifest (ETag cache)
+│   ├── NewsService      official launcher news feed
+│   └── MicrosoftAuth    device-code OAuth → XBL → XSTS → MC profile
+├── core/                game pipeline
+│   ├── VersionJson      Mojang version JSON: rules, natives, arguments
+│   ├── VersionInstaller client jar / libraries / assets / natives
+│   ├── DownloadEngine   concurrent, verified, cancellable downloads
+│   ├── GameLauncher     builds the java command, streams game output
+│   ├── LaunchController play flow state machine
+│   ├── Settings, AccountStore, Os, Log
+├── model/               Account
+├── ui/                  custom-painted Swing GUI
+│   ├── Theme, Icons     palette, Montserrat, procedural icon set
+│   ├── LauncherWindow, LauncherShell, TitleBar, NavRail
+│   ├── PlayPanel        hero, version picker, PLAY/progress morph
+│   ├── NewsPanel        patch-notes browser + reader
+│   ├── SettingsPanel    Java/game/download settings
+│   ├── AccountsDialog   offline + Microsoft device-code sign-in
+│   └── components/      buttons, toggles, sliders, combo, scrollbar…
+└── util/                Json, Http, Async, Log, Os
+```
+
+Design principles:
+
+- **No UI framework** — containers paint their own backgrounds; hit-testing is
+  hand-rolled per component. This is what keeps the UI identical on all OSes.
+- **JSON is a first-class citizen** — a strict-but-fast parser/serializer in
+  ~300 lines, used by every API.
+- **Self-verifying downloads** — everything Mojang signs with SHA-1 is checked;
+  assets skip re-verification via size fast-path.
+- **Integration-tested installer** — `--selftest` boots a local HTTP server and
+  runs the full pipeline (manifest → metadata → jars → natives extraction →
+  assets → logging config), then re-runs it to prove the fast path skips
+  every download.
+- **`--selftest`** ships with the jar and covers the JSON engine, Mojang rule
+  semantics, argument substitution, auth payload shapes and more, so launcher
+  logic can be validated headlessly.
 
 ## License
 
-[MIT](LICENSE) — Copyright OmniNodeCo, including MIT-licensed work originally published by ci010.
-
-## Credits
-
-Core launch, install, and UI architecture is derived from the MIT-licensed
-[X Minecraft Launcher](https://github.com/Voxelum/x-minecraft-launcher) by ci010 and contributors.
-OmniLauncher-MC is a separate product with its own name, branding, and GitHub project.
+MIT — see [LICENSE](LICENSE). Montserrat is bundled under the
+[SIL Open Font License](resources/fonts/OFL.txt).

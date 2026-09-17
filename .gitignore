@@ -1,36 +1,17 @@
-.DS_Store
-*/dist/**/*
-**/dist/
-*.gen
-coverage
-node_modules/
-npm-debug.log
-npm-debug.log.*
-thumbs.db
-!.gitkeep
-*.lock
+# Build output
+build/
+out/
+
+# Local tooling (downloaded, not committed)
+tools/
+
+# Runtime data that may appear during local testing
 *.log
-*.bin
-/temp
-omnilauncher-electron-app/build/appx
-.env
+preview*.png
+/omni-data/
 
-p2p.network
-
-*/build/output/*
-package-lock.json
-
-
-## CODE EDITORS
+# Editor / OS noise
+.idea/
 .vscode/
-.zed/
-/docs/
-!/docs/tutorial/
-
-# e2e artifacts
-e2e/artifacts/
-e2e/playwright-report/
-e2e/test-results/
-
-# local download-probe / benchmark artifacts (opt-in tests)
-/bench-out/
+*.iml
+.DS_Store
