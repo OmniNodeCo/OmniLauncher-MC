@@ -233,8 +233,13 @@ public class PlayPanel extends JPanel {
     private void syncVersionBox() {
         VersionManifest.Entry selected = VersionManifest.resolveSelected(Settings.get().lastVersionId);
         versionBox.setSelected(selected, false);
-        if (AppState.get().getPhase() == com.omninode.omnilauncher.ui.AppState.Phase.IDLE)
-            AppState.get().set(AppState.Phase.IDLE, "Ready to play");
+        if (AppState.get().getPhase() == com.omninode.omnilauncher.ui.AppState.Phase.IDLE) {
+            if (VersionManifest.isStaleCache())
+                AppState.get().set(AppState.Phase.IDLE,
+                        "Offline — showing the cached version list");
+            else
+                AppState.get().set(AppState.Phase.IDLE, "Ready to play");
+        }
         playButton.repaint();
     }
 

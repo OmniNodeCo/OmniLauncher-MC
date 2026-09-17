@@ -20,6 +20,16 @@ public class LauncherWindow extends JFrame {
         setSize(Math.max(980, s.windowWidth), Math.max(600, s.windowHeight));
         setLocationRelativeTo(null);
 
+        try {
+            var icon = Icons.grassBlock(128);
+            setIconImage(icon);
+            if (java.awt.Taskbar.isTaskbarSupported() && java.awt.Taskbar.getTaskbar()
+                    .isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {
+                java.awt.Taskbar.getTaskbar().setIconImage(icon);
+            }
+        } catch (Throwable ignored) {
+        }
+
         shell = new LauncherShell(this);
         setContentPane(shell);
         new WindowResizer(this).install();

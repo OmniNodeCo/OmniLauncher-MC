@@ -69,13 +69,36 @@ public class Main {
                 """.formatted(GameLauncher.LAUNCHER_VERSION));
     }
 
+    private static java.nio.channels.FileLock instanceLock;
+    private static java.nio.channels.FileChannel instanceChannel;
+
     private static void launchGui() {
+        System.setProperty("apple.application.name", "OmniLauncher");
+        if (!acquireInstanceLock()) {
+            System.err.println("OmniLauncher is already running.");
+            System.exit(4);
+            return;
+        }
         Log.init(Os.logsDir());
         Log.info("OmniLauncher " + GameLauncher.LAUNCHER_VERSION + " starting — " + Os.get().family
                 + "/" + Os.get().arch + ", data: " + Os.dataDir());
         Settings.get();
         AccountStore.load();
         LauncherWindow.showWindow();
+    }
+
+    /** Prevents two launcher instances from racing on the same data directory. */
+    private static boolean acquireInstanceLock() {
+        try {
+            instanceChannel = java.nio.channels.FileChannel.open(Os.dataDir().resolve("launcher.lock"),
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.WRITE);
+            instanceLock = instanceChannel.tryLock();
+            return instanceLock != null;
+        } catch (Exception e) {
+            Log.error("Instance lock failed", e);
+            return true; // fail open rather than block the user
+        }
     }
 
     private static int headlessInstall(String versionId) {

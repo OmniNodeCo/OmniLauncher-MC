@@ -122,9 +122,10 @@ Design principles:
   runs the full pipeline (manifest → metadata → jars → natives extraction →
   assets → logging config), then re-runs it to prove the fast path skips
   every download.
-- **`--selftest`** ships with the jar and covers the JSON engine, Mojang rule
-  semantics, argument substitution, auth payload shapes and more, so launcher
-  logic can be validated headlessly.
+- **`--selftest`** ships with the jar and runs 137 checks headlessly: the JSON
+  engine, Mojang rule semantics, argument construction, the full install
+  pipeline against a local HTTP server, the Microsoft device-code chain
+  against faked OAuth/Xbox/Minecraft endpoints, and the Java-runtime manager.
 
 ## License
 

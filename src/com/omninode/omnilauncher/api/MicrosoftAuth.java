@@ -17,16 +17,17 @@ import com.omninode.omnilauncher.util.Json;
  */
 public class MicrosoftAuth {
 
-    private static final String DEVICE_CODE_URL =
+    /** Endpoints are mutable so tests can point the whole chain at a local fake. */
+    public static volatile String DEVICE_CODE_URL =
             "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-    private static final String TOKEN_URL =
+    public static volatile String TOKEN_URL =
             "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
     private static final String SCOPE = "XboxLive.signin offline_access";
 
-    private static final String XBL_AUTH_URL = "https://user.auth.xboxlive.com/user/authenticate";
-    private static final String XSTS_AUTH_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
-    private static final String MC_LOGIN_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
-    private static final String MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
+    public static volatile String XBL_AUTH_URL = "https://user.auth.xboxlive.com/user/authenticate";
+    public static volatile String XSTS_AUTH_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
+    public static volatile String MC_LOGIN_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
+    public static volatile String MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
 
     /** Result of starting the device-code flow. */
     public record DeviceCode(String userCode, String verificationUri, String deviceCode, long interval, long expiresAt) {}

@@ -33,7 +33,11 @@ public class VersionManifest {
     private static volatile String latestRelease = "";
     private static volatile String latestSnapshot = "";
     private static volatile long loadedAt;
+    private static volatile boolean staleCache;
     private static final long TTL_MS = 10 * 60_000;
+
+    /** True when the last manifest refresh failed and a cached copy is being used. */
+    public static boolean isStaleCache() { return staleCache; }
 
     /** Loads (or reloads) the manifest in the background, then invokes the callback on the EDT. */
     public static void loadAsync(Runnable onSuccess, java.util.function.Consumer<String> onError) {
@@ -62,12 +66,14 @@ public class VersionManifest {
             Map<String, List<String>> rh = new java.util.HashMap<>();
             byte[] body = Http.getIfChanged(MANIFEST_URL, etag, rh);
             if (body != null) {
+                staleCache = false;
                 Files.write(cache, body);
                 List<String> etags = rh.getOrDefault("etag", List.of());
                 if (!etags.isEmpty()) Files.writeString(etagFile, etags.get(0));
             }
         } catch (Exception e) {
             if (!Files.exists(cache)) throw e;
+            staleCache = true;
             Log.warn("Manifest refresh failed, using cache: " + e.getMessage());
         }
         parse(Files.readString(cache, StandardCharsets.UTF_8));

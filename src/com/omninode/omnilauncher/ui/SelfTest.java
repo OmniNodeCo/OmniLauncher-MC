@@ -162,6 +162,7 @@ public final class SelfTest {
             installPipelineTests();
             gameCommandTests();
             runtimeTests();
+            authFlowTests();
         } catch (Throwable t) {
             failed++;
             System.out.println("FAIL  install pipeline threw: " + t);
@@ -682,6 +683,143 @@ public final class SelfTest {
         } finally {
             server.stop(0);
             RuntimeManager.productsBaseUrl = "https://piston-meta.mojang.com/v1/products/java-runtime";
+            Os.setDataDirForTests(null);
+        }
+    }
+
+    /* ---------------------------------------------------- Microsoft chain */
+
+    /**
+     * Walks the full device-code chain (devicecode -> token -> XBL -> XSTS ->
+     * minecraftservices -> profile) against a local fake of every endpoint,
+     * asserting request shapes, the pending->success poll rhythm and the
+     * resulting Account. Also covers the XSTS XErr path.
+     */
+    private static void authFlowTests() throws Exception {
+        Path sandbox = Files.createTempDirectory("omni-auth");
+        Os.setDataDirForTests(sandbox);
+        java.util.concurrent.atomic.AtomicInteger tokenCalls =
+                new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean xstsDeny =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicReference<String> lastProfileAuth =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        var server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.start();
+        final String base = "http://127.0.0.1:" + server.getAddress().getPort();
+        server.createContext("/devicecode", exchange -> {
+            byte[] body = ("{\"device_code\":\"dc-123\",\"user_code\":\"ABCD EFGH\","
+                    + "\"verification_uri\":\"" + base + "/link\",\"interval\":1,\"expires_in\":900}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            try (var out = exchange.getResponseBody()) { out.write(body); }
+        });
+        server.createContext("/token", exchange -> {
+            boolean pending = tokenCalls.incrementAndGet() == 1;
+            // real Azure AD answers authorization_pending with HTTP 400
+            byte[] b = (pending
+                    ? "{\"error\":\"authorization_pending\",\"error_description\":\"waiting\"}"
+                    : "{\"access_token\":\"ms-token\",\"refresh_token\":\"ms-refresh\","
+                      + "\"expires_in\":3600}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(pending ? 400 : 200, b.length);
+            try (var out = exchange.getResponseBody()) { out.write(b); }
+        });
+        server.createContext("/xbl", exchange -> {
+            byte[] b = ("{\"Token\":\"xbl-token\",\"DisplayClaims\":{\"xui\":[{\"uhs\":\"uhs-1\"}]}}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, b.length);
+            try (var out = exchange.getResponseBody()) { out.write(b); }
+        });
+        server.createContext("/xsts", exchange -> {
+            if (xstsDeny.get()) {
+                byte[] b = "{\"XErr\":2148916233,\"Identity\":\"0\"}"
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(401, b.length);
+                try (var out = exchange.getResponseBody()) { out.write(b); }
+                return;
+            }
+            byte[] b = ("{\"Token\":\"xsts-token\",\"DisplayClaims\":{\"xui\":[{\"uhs\":\"uhs-2\"}]}}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, b.length);
+            try (var out = exchange.getResponseBody()) { out.write(b); }
+        });
+        server.createContext("/login", exchange -> {
+            byte[] b = "{\"access_token\":\"mc-token\",\"expires_in\":86400}"
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, b.length);
+            try (var out = exchange.getResponseBody()) { out.write(b); }
+        });
+        server.createContext("/profile", exchange -> {
+            lastProfileAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] b = ("{\"id\":\"770c88d14dac553db02f99e9a488f83e\",\"name\":\"Alex\","
+                    + "\"skins\":[{\"id\":\"s\",\"state\":\"ACTIVE\","
+                    + "\"url\":\"http://textures/skin.png\"}]}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, b.length);
+            try (var out = exchange.getResponseBody()) { out.write(b); }
+        });
+        String oldDevice = MicrosoftAuth.DEVICE_CODE_URL;
+        String oldToken = MicrosoftAuth.TOKEN_URL;
+        String oldXbl = MicrosoftAuth.XBL_AUTH_URL;
+        String oldXsts = MicrosoftAuth.XSTS_AUTH_URL;
+        String oldLogin = MicrosoftAuth.MC_LOGIN_URL;
+        String oldProfile = MicrosoftAuth.MC_PROFILE_URL;
+        MicrosoftAuth.DEVICE_CODE_URL = base + "/devicecode";
+        MicrosoftAuth.TOKEN_URL = base + "/token";
+        MicrosoftAuth.XBL_AUTH_URL = base + "/xbl";
+        MicrosoftAuth.XSTS_AUTH_URL = base + "/xsts";
+        MicrosoftAuth.MC_LOGIN_URL = base + "/login";
+        MicrosoftAuth.MC_PROFILE_URL = base + "/profile";
+
+        try {
+            // start: device code fields parse
+            var dc = MicrosoftAuth.startDeviceCode("client-id");
+            eq("ABCD EFGH", dc.userCode(), "auth: user code");
+            eq("dc-123", dc.deviceCode(), "auth: device code");
+            eq(1L, dc.interval(), "auth: poll interval");
+            eq(base + "/link", dc.verificationUri(), "auth: verification uri");
+
+            // poll 1 -> pending; poll 2 -> full chain -> account
+            var pending = MicrosoftAuth.pollDeviceCode("client-id", dc);
+            eq(MicrosoftAuth.PollState.PENDING, pending.state(), "auth: first poll pending");
+            var done = MicrosoftAuth.pollDeviceCode("client-id", dc);
+            eq(MicrosoftAuth.PollState.SUCCESS, done.state(), "auth: second poll success");
+            var acc = done.account();
+            eq(true, acc != null, "auth: account produced");
+            eq("Alex", acc.getName(), "auth: profile name");
+            eq("770c88d1-4dac-553d-b02f-99e9a488f83e", acc.getUuid(), "auth: profile uuid dashed");
+            eq(true, acc.isMicrosoft(), "auth: account type");
+            eq("ms-refresh", acc.getRefreshToken(), "auth: refresh token kept");
+            eq("http://textures/skin.png", acc.getSkinUrl(), "auth: active skin captured");
+            eq("Bearer mc-token", lastProfileAuth.get(), "auth: profile bearer header");
+            eq(true, acc.getExpiresAt() > System.currentTimeMillis(), "auth: expiry in future");
+
+            // XSTS denial: poll surfaces the friendly XErr message as a failure
+            xstsDeny.set(true);
+            tokenCalls.set(10); // next poll returns tokens again
+            var denied = MicrosoftAuth.pollDeviceCode("client-id", dc);
+            eq(MicrosoftAuth.PollState.FAILED, denied.state(), "auth: xsts denial fails the poll");
+            eq(true, String.valueOf(denied.errorDetail()).contains("no Xbox profile"),
+                    "auth: xerr friendly message");
+            // and completeSignIn directly throws the same friendly error
+            try {
+                MicrosoftAuth.completeSignIn("ms-token", "r", 60);
+                fail("auth: xsts denial should throw from completeSignIn");
+            } catch (IllegalStateException e) {
+                eq(true, String.valueOf(e.getMessage()).contains("no Xbox profile"),
+                        "auth: completeSignIn throws friendly message");
+            }
+        } finally {
+            server.stop(0);
+            MicrosoftAuth.DEVICE_CODE_URL = oldDevice;
+            MicrosoftAuth.TOKEN_URL = oldToken;
+            MicrosoftAuth.XBL_AUTH_URL = oldXbl;
+            MicrosoftAuth.XSTS_AUTH_URL = oldXsts;
+            MicrosoftAuth.MC_LOGIN_URL = oldLogin;
+            MicrosoftAuth.MC_PROFILE_URL = oldProfile;
             Os.setDataDirForTests(null);
         }
     }
