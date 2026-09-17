@@ -70,12 +70,16 @@ jobs:
 
       - name: Report packaging failure
         if: failure()
+        shell: bash
         run: |
-          tail -n 20 build/pkg.log | while IFS= read -r line; do
-            line=${line//%/%25}
-            line=${line//,/＇}
-            echo "::error::${line:0:450}"
-          done
+          if [ -f build/pkg.log ]; then
+            tail -n 25 build/pkg.log | while IFS= read -r line; do
+              msg=$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')
+              printf '::error::%s\n' "$msg"
+            done
+          else
+            echo '::error::packaging failed before build/pkg.log existed'
+          fi
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
