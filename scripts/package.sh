@@ -9,7 +9,9 @@
 #   ./scripts/package.sh deb|rpm        # Linux
 #
 # Output lands in build/dist/.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'rc=$?; cmd=${BASH_COMMAND:-?}; line=${BASH_LINENO[0]:-0};
+      printf "::error::package.sh FAILED rc=%s near line %s: %s\n" "$rc" "$line" "$(printf "%s" "$cmd" | cut -c1-300 | tr ",:" "--")"' ERR
 cd "$(dirname "$0")/.."
 
 TYPE="${1:-auto}"

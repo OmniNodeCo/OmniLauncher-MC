@@ -64,6 +64,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq rpm
 
       - name: Package native installer
+        shell: bash
         run: |
           set -o pipefail
           mkdir -p build
@@ -74,9 +75,17 @@ jobs:
         shell: bash
         run: |
           if [ -f build/pkg.log ]; then
-            tail -n 25 build/pkg.log | while IFS= read -r line; do
-              msg=$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')
-              printf '::error::%s\n' "$msg"
+            {
+              echo "## pkg.log tail"
+              tail -n 60 build/pkg.log
+              echo "## error patterns"
+              grep -nE "error:|Error|ERROR|Exception|FAILED|not found|No such|refusing|invalid" build/pkg.log | tail -n 20 || true
+            } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            grep -E "error:|Error|ERROR|Exception|FAILED|not found|No such|refusing|invalid" build/pkg.log | tail -n 12 | while IFS= read -r line; do
+              printf '::error::%s\n' "$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')"
+            done
+            tail -n 3 build/pkg.log | while IFS= read -r line; do
+              printf '::error::TAIL %s\n' "$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')"
             done
           else
             echo '::error::packaging failed before build/pkg.log existed'
