@@ -72,7 +72,7 @@ cp build/OmniLauncher.jar build/jpackage-input/
 
 run_jpackage() {
     echo "==> jpackage --type $1"
-    "$JP" --type "$1" "${COMMON_ARGS[@]}" \
+    "$JP" --type "$1" ${COMMON_ARGS[@]+"${COMMON_ARGS[@]}"} \
         --main-jar OmniLauncher.jar \
         --main-class com.omninode.omnilauncher.Main \
         "$@"
@@ -86,25 +86,25 @@ case "$TYPE" in
         ICON_ARGS=()
         [ -f build/icons/OmniLauncher.ico ] && ICON_ARGS=(--icon build/icons/OmniLauncher.ico)
         if [ "$TYPE" = "exe" ]; then
-            if ! run_jpackage exe --win-menu --win-shortcut --win-dir-chooser "${ICON_ARGS[@]}"; then
+            if ! run_jpackage exe --win-menu --win-shortcut --win-dir-chooser ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}; then
                 echo "!! exe packaging failed (WiX missing?) — falling back to msi"
-                run_jpackage msi --win-menu --win-shortcut --win-dir-chooser "${ICON_ARGS[@]}"
+                run_jpackage msi --win-menu --win-shortcut --win-dir-chooser ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
             fi
         else
-            run_jpackage msi --win-menu --win-shortcut --win-dir-chooser "${ICON_ARGS[@]}"
+            run_jpackage msi --win-menu --win-shortcut --win-dir-chooser ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
         fi
         ;;
     dmg)
         ICON_ARGS=()
         [ -f build/icons/OmniLauncher.icns ] && ICON_ARGS=(--icon build/icons/OmniLauncher.icns)
         run_jpackage dmg --mac-package-name OmniLauncher \
-            --mac-package-identifier com.omninode.omnilauncher "${ICON_ARGS[@]}"
+            --mac-package-identifier com.omninode.omnilauncher ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
         ;;
     deb|rpm)
         ICON_ARGS=()
         [ -f build/icons/icon-512.png ] && ICON_ARGS=(--icon build/icons/icon-512.png)
         run_jpackage "$TYPE" --linux-shortcut --linux-menu-group Game \
-            --license-file LICENSE "${ICON_ARGS[@]}"
+            --license-file LICENSE ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
         ;;
     *)
         echo "error: unknown package type '$TYPE'" >&2

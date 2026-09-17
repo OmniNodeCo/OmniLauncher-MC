@@ -64,8 +64,18 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq rpm
 
       - name: Package native installer
-        run: bash ./scripts/package.sh ${{ matrix.type }}
-        shell: bash
+        run: |
+          set -o pipefail
+          bash -x ./scripts/package.sh ${{ matrix.type }} 2>&1 | tee build/pkg.log
+
+      - name: Report packaging failure
+        if: failure()
+        run: |
+          tail -n 20 build/pkg.log | while IFS= read -r line; do
+            line=${line//%/%25}
+            line=${line//,/＇}
+            echo "::error::${line:0:450}"
+          done
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
