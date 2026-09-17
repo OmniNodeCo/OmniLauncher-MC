@@ -59,9 +59,19 @@ if [ "$TYPE" = "auto" ]; then
     esac
 fi
 
+# macOS bundler rejects app-versions whose first number is 0 (CFBundleVersion
+# rule); keep the human version 0.x.y for filenames but use a bundle-legal one
+# inside the .app metadata.
+JP_VERSION="$VERSION"
+if [ "$OS" = macos ]; then
+    case "$VERSION" in
+        0.*) JP_VERSION="1.${VERSION#0.}" ;;
+    esac
+fi
+
 COMMON_ARGS=(
     --name OmniLauncher
-    --app-version "$VERSION"
+    --app-version "$JP_VERSION"
     --vendor OmniNodeCo
     --description "Native, dependency-free Minecraft launcher"
     --input build/jpackage-input
