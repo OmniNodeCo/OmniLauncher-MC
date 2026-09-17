@@ -73,8 +73,10 @@ mkdir -p build/jpackage-input
 cp build/OmniLauncher.jar build/jpackage-input/
 
 run_jpackage() {
-    echo "==> jpackage --type $1"
-    "$JP" --type "$1" ${COMMON_ARGS[@]+"${COMMON_ARGS[@]}"} \
+    local type="$1"
+    shift
+    echo "==> jpackage --type $type"
+    "$JP" --type "$type" ${COMMON_ARGS[@]+"${COMMON_ARGS[@]}"} \
         --main-jar OmniLauncher.jar \
         --main-class com.omninode.omnilauncher.Main \
         "$@"
