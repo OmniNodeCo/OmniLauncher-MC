@@ -79,10 +79,13 @@ jobs:
               echo "## pkg.log tail"
               tail -n 60 build/pkg.log
               echo "## error patterns"
-              grep -nE "error:|Error|ERROR|Exception|FAILED|not found|No such|refusing|invalid" build/pkg.log | tail -n 20 || true
+              grep -inE "error|fail|invalid|not found|no such|exception|denied|cannot|unable|hdiutil|osascript" build/pkg.log | tail -n 20 || true
             } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
-            grep -E "error:|Error|ERROR|Exception|FAILED|not found|No such|refusing|invalid" build/pkg.log | tail -n 12 | while IFS= read -r line; do
+            grep -inE "error|fail|invalid|not found|no such|exception|denied|cannot|unable|hdiutil|osascript" build/pkg.log | tail -n 12 | while IFS= read -r line; do
               printf '::error::%s\n' "$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')"
+            done
+            tail -n 60 build/pkg.log | grep -v '^+' | tail -n 12 | while IFS= read -r line; do
+              printf '::error::OUT %s\n' "$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')"
             done
             tail -n 3 build/pkg.log | while IFS= read -r line; do
               printf '::error::TAIL %s\n' "$(printf '%s' "$line" | cut -c1-380 | tr ',:' '--')"

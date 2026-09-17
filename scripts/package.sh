@@ -99,10 +99,18 @@ case "$TYPE" in
         fi
         ;;
     dmg)
+        # jpackage's DMG bundler (hdiutil + Finder AppleScript) is flaky on CI;
+        # build the .app with app-image (embeds the icns), then hdiutil directly.
         ICON_ARGS=()
         [ -f build/icons/OmniLauncher.icns ] && ICON_ARGS=(--icon build/icons/OmniLauncher.icns)
-        run_jpackage dmg --mac-package-name OmniLauncher \
+        rm -rf build/mac-app
+        run_jpackage app-image --dest build/mac-app \
+            --mac-package-name OmniLauncher \
             --mac-package-identifier com.omninode.omnilauncher ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
+        APP=$(find build/mac-app -maxdepth 2 -type d -name '*.app' | head -1)
+        [ -n "$APP" ] || { echo "error: app-image produced no .app" >&2; exit 1; }
+        hdiutil create -volname OmniLauncher -srcfolder "$APP" \
+            -ov -format UDZO build/dist/OmniLauncher-$VERSION.dmg
         ;;
     deb|rpm)
         ICON_ARGS=()
