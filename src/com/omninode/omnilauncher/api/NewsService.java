@@ -25,7 +25,7 @@ public class NewsService {
     public static final String CONTENT_BASE = "https://launchercontent.mojang.com";
 
     public record Item(String title, String date, String category, String shortText,
-                       String longText, String imageUrl) {
+                       String longText, String imageUrl, String detailImageUrl) {
         public String formattedDate() {
             try {
                 var d = java.time.LocalDate.parse(date.substring(0, 10));
@@ -125,13 +125,16 @@ public class NewsService {
             if (category.isBlank()) category = Json.str(m, "type", "news");
             String shortText = Json.str(m, "shortText", "");
             if (shortText.isBlank()) shortText = summarize(text, 150);
+            String article = Json.str(m, "articleBody", "");
+            String longText = article.isBlank() ? text : article;
             out.add(new Item(
                     Json.str(m, "title", "Untitled"),
                     Json.str(m, "date", ""),
                     category,
                     shortText,
-                    text,
-                    extractImageUrl(m)));
+                    longText,
+                    extractImageUrl(m, "image", "playPageImage", "newsPageImage"),
+                    extractImageUrl(m, "newsPageImage", "image", "playPageImage")));
         }
         items = List.copyOf(out);
     }
@@ -180,14 +183,25 @@ public class NewsService {
         return sb.toString();
     }
 
-    private static String extractImageUrl(Map<String, Object> m) {
-        Object img = m.get("image");
-        String url = null;
-        if (img instanceof Map) url = Json.str(Json.asMap(img), "url", null);
-        else if (img instanceof String s) url = s;
-        if (url == null || url.isBlank()) return null;
-        if (url.startsWith("http")) return url;
-        return CONTENT_BASE + (url.startsWith("/") ? url : "/" + url);
+    /**
+     * Resolves the first usable image URL from the given candidate keys.
+     * The real feed stores art in {@code playPageImage} (700x466 card) and
+     * {@code newsPageImage} (772x350 banner); older shapes used a plain
+     * {@code image} string or object. Values may be absolute URLs or paths
+     * relative to the content CDN.
+     */
+    private static String extractImageUrl(Map<String, Object> m, String... keys) {
+        for (String key : keys) {
+            Object img = m.get(key);
+            String url = null;
+            if (img instanceof Map) url = Json.str(Json.asMap(img), "url", null);
+            else if (img instanceof String s) url = s;
+            if (url != null && !url.isBlank()) {
+                if (url.startsWith("http")) return url;
+                return CONTENT_BASE + (url.startsWith("/") ? url : "/" + url);
+            }
+        }
+        return null;
     }
 
     public static List<Item> items() { return items; }

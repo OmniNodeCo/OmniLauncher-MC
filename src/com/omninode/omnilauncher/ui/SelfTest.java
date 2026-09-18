@@ -132,17 +132,23 @@ public final class SelfTest {
     """;
 
     private static final String NEWS_JSON = """
-    { "entries": [
-      { "id": "minecraft-java-mounts-of-mayhem", "title": "Mounts of Mayhem",
-        "type": "patch_notes", "category": "",
-        "text": "<p>Saddle up! Trials &amp; tribulations await in <strong>Mounts of Mayhem</strong>.</p><p>Second paragraph with more patch note details.</p>",
-        "image": "images/2026-mounts-of-mayhem-art.jpg",
-        "date": "2026-07-28T09:41:00+00:00", "language": "en-us", "version": "1.21.9" },
-      { "id": "deep-dive-copper", "title": "Relative Image",
-        "type": "deep_dive", "category": "snapshot",
+    { "version": 1, "entries": [
+      { "title": "Brave a new dimension in Dungeons II", "tag": "news",
+        "category": "Minecraft Dungeons", "date": "2026-08-20",
+        "text": "Journey into the Sift to explore uncharted lands and fight unfamiliar threats.",
+        "playPageImage": { "title": "MCD2_MinecraftLauncher_700x466.png",
+                           "url": "/v2/images/MCD2MinecraftLauncher700x466.png" },
+        "newsPageImage": { "title": "MCD2_MinecraftLauncher_772x350.png",
+                           "url": "/v2/images/MCD2MinecraftLauncher772x350.png",
+                           "dimensions": { "width": 772, "height": 350 } },
+        "readMoreLink": "https://www.minecraft.net/about-dungeons-ii?OCID=Launcher",
+        "cardBorder": false, "articleBody": "", "newsType": ["Dungeons", "News page"],
+        "id": "65e0c5c5", "needsTranslation": true },
+      { "title": "Legacy image entry", "tag": "news", "category": "Minecraft for Windows",
+        "date": "2026-08-01",
         "text": "The copper golem sorts your chests while the shelf stores your leftovers and this gentle news body keeps drifting well past the one hundred and fifty character summary cut so truncation is genuinely exercised.",
         "image": { "url": "/v2/images/y.jpg" },
-        "date": "2026-08-01T00:00:00+00:00", "language": "en-us" }
+        "articleBody": "", "newsType": ["News page", "Bedrock"], "id": "12b600e8" }
     ] }
     """;
 
@@ -305,26 +311,46 @@ public final class SelfTest {
     }
 
     private static void newsTests() {
-        NewsService.parse(NEWS_JSON); // {"entries":[...]} wrapper, as the Mojang news API returns
+        // fixture mirrors the real launchercontent.mojang.com/v2/news.json shape
+        NewsService.parse(NEWS_JSON);
         eq(2, NewsService.items().size(), "news count");
-        eq("Mounts of Mayhem", NewsService.items().get(0).title(), "news title");
-        eq("Saddle up! Trials & tribulations await in Mounts of Mayhem. Second paragraph with more patch note details.",
-                NewsService.items().get(0).shortText(), "news shortText derived from HTML text");
-        eq(true, NewsService.items().get(0).longText().startsWith("<p>Saddle up!")
-                && NewsService.items().get(0).longText().endsWith("</p>"),
-                "news longText keeps raw HTML");
-        eq("patch_notes", NewsService.items().get(0).category(), "news category falls back to type");
-        eq("https://launchercontent.mojang.com/images/2026-mounts-of-mayhem-art.jpg",
-                NewsService.items().get(0).imageUrl(), "news relative string image resolved");
+        eq("Brave a new dimension in Dungeons II", NewsService.items().get(0).title(), "news title");
+        eq("Journey into the Sift to explore uncharted lands and fight unfamiliar threats.",
+                NewsService.items().get(0).shortText(), "news shortText from text");
+        eq("Journey into the Sift to explore uncharted lands and fight unfamiliar threats.",
+                NewsService.items().get(0).longText(), "news longText falls back to text");
+        eq("Minecraft Dungeons", NewsService.items().get(0).category(), "news category is the game name");
+        eq("https://launchercontent.mojang.com/v2/images/MCD2MinecraftLauncher700x466.png",
+                NewsService.items().get(0).imageUrl(), "news card image from playPageImage");
+        eq("https://launchercontent.mojang.com/v2/images/MCD2MinecraftLauncher772x350.png",
+                NewsService.items().get(0).detailImageUrl(), "news banner image from newsPageImage");
+        eq(true, NewsService.items().get(0).formattedDate().startsWith("August")
+                && NewsService.items().get(0).formattedDate().contains("2026"), "news date format");
         eq("https://launchercontent.mojang.com/v2/images/y.jpg",
-                NewsService.items().get(1).imageUrl(), "news map image resolved");
+                NewsService.items().get(1).imageUrl(), "news legacy image map resolved");
+        eq("https://launchercontent.mojang.com/v2/images/y.jpg",
+                NewsService.items().get(1).detailImageUrl(), "news detail falls back to card image");
         var blurb = NewsService.items().get(1).shortText();
         eq(true, blurb.length() <= 151 && blurb.endsWith("…"), "news blurb truncated at word boundary");
-        eq(true, NewsService.items().get(0).formattedDate().contains("2026"), "news date format");
+        // articleBody preferred for the reader when present
+        NewsService.parse("""
+            { "entries": [ { "title": "Rich", "date": "2026-08-02", "category": "Minecraft: Java Edition",
+              "text": "plain", "articleBody": "<p>rich body</p>" } ] }
+            """);
+        eq("<p>rich body</p>", NewsService.items().get(0).longText(), "news articleBody preferred");
+        // legacy bare-array payloads still parse
         NewsService.parse("[{ \"title\": \"Bare\", \"date\": \"2026-08-02\", \"text\": \"<b>hi</b> &amp; bye\" }]");
         eq(1, NewsService.items().size(), "news bare array accepted");
         eq("hi & bye", NewsService.items().get(0).shortText(), "news bare array text stripped");
         eq("news", NewsService.items().get(0).category(), "news bare array category default");
+        // ImageLoader cache names: stable, safe, distinct per URL
+        var a = ImageLoader.cacheFileFor("https://launchercontent.mojang.com/v2/images/MCD2_700x466.png");
+        var b = ImageLoader.cacheFileFor("https://launchercontent.mojang.com/v2/images/MCD2_700x466.png");
+        var c = ImageLoader.cacheFileFor("https://launchercontent.mojang.com/v2/images/other.jpg?q=1&x=2");
+        eq(a.toString(), b.toString(), "image cache name stable");
+        eq(true, !a.toString().equals(c.toString()), "image cache names distinct");
+        eq(true, a.getFileName().toString().matches("[0-9a-f]+-MCD2_700x466\\.png"), "image cache name safe");
+        eq(true, c.getFileName().toString().matches("[0-9a-f]+-[A-Za-z0-9._-]+"), "image cache strips query chars");
         NewsService.parse(NEWS_JSON); // restore wrapped fixture for any later readers
     }
 
@@ -848,7 +874,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.1", GameLauncher.LAUNCHER_VERSION, "version is 0.3.1");
+        eq("0.3.2", GameLauncher.LAUNCHER_VERSION, "version is 0.3.2");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");

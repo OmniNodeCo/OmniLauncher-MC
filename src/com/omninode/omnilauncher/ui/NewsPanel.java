@@ -278,7 +278,8 @@ public class NewsPanel extends JPanel {
         DetailImage(NewsService.Item item) {
             this.item = item;
             setPreferredSize(new Dimension(760, 260));
-            ImageLoader.load(item.imageUrl(), img -> { image = img; repaint(); });
+            ImageLoader.load(item.detailImageUrl() != null ? item.detailImageUrl() : item.imageUrl(),
+                    img -> { image = img; repaint(); });
         }
 
         @Override protected void paintComponent(Graphics g0) {
