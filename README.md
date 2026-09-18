@@ -64,6 +64,31 @@ Bundles land in `build/dist/`. On `v*` tags CI builds **exe (Windows),
 dmg (macOS) and deb+rpm (Linux)** with lint + full test gates and attaches
 them to the GitHub Release.
 
+### Upgrading & uninstalling
+
+All user data lives **outside the app**, so installing, upgrading and
+uninstalling never touches your accounts, settings or downloaded versions:
+
+| OS | Data folder |
+| --- | --- |
+| Windows | `%APPDATA%\OmniLauncher` |
+| macOS | `~/Library/Application Support/OmniLauncher` |
+| Linux | `~/.config/omnilauncher` |
+
+- **Windows** — run the new installer over the old install: the MSI removes
+  the previously installed OmniLauncher from the same folder first
+  (`RemoveExistingProducts`, upgrades *and* downgrades allowed), then installs
+  the new version in its place. Uninstall via *Apps & features* and re-run any
+  installer to reinstall. (Re-running the exact same version reports
+  "already installed" — that's a Windows Installer rule; remove it first.)
+- **macOS** — the dmg shows a drag-to-Applications layout; when an older copy
+  is installed, choose **Replace** at the prompt.
+- **Linux** — install the new package over the old one
+  (`sudo dpkg -i omnilauncher_*.deb` / `sudo rpm -U omnilauncher-*.rpm`);
+  the package is replaced in place at the same location.
+
+Delete the data folder from the table above if you want everything gone.
+
 ## Build & CI
 
 Requires **JDK 17+** (any vendor). No other tooling.

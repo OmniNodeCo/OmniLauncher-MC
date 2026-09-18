@@ -113,13 +113,31 @@ case "$TYPE" in
         # build the .app with app-image (embeds the icns), then hdiutil directly.
         ICON_ARGS=()
         [ -f build/icons/OmniLauncher.icns ] && ICON_ARGS=(--icon build/icons/OmniLauncher.icns)
-        rm -rf build/mac-app
+        rm -rf build/mac-app build/mac-dmg
         run_jpackage app-image --dest build/mac-app \
             --mac-package-name OmniLauncher \
             --mac-package-identifier com.omninode.omnilauncher ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}
         APP=$(find build/mac-app -maxdepth 2 -type d -name '*.app' | head -1)
         [ -n "$APP" ] || { echo "error: app-image produced no .app" >&2; exit 1; }
-        hdiutil create -volname OmniLauncher -srcfolder "$APP" \
+        # Classic drag-to-Applications layout; replacing an old copy keeps all
+        # user data (it lives in ~/Library/Application Support/OmniLauncher).
+        mkdir -p build/mac-dmg
+        mv "$APP" build/mac-dmg/OmniLauncher.app
+        cat > build/mac-dmg/"Installation Guide.txt" <<'EOF'
+OmniLauncher — installing & upgrading
+
+1. Drag OmniLauncher onto the Applications folder link on the right.
+2. If an older copy is already installed, macOS asks whether to replace
+   it — choose "Replace". Your accounts, settings and downloaded game
+   versions are NOT stored inside the app; they live in
+   ~/Library/Application Support/OmniLauncher
+   and are kept when you upgrade or remove OmniLauncher.
+
+Uninstalling: drag OmniLauncher from Applications to the Trash.
+(Delete the folder above too if you want everything gone.)
+EOF
+        ln -s /Applications build/mac-dmg/Applications
+        hdiutil create -volname OmniLauncher -srcfolder build/mac-dmg \
             -ov -format UDZO build/dist/OmniLauncher-$VERSION.dmg
         ;;
     deb|rpm)
