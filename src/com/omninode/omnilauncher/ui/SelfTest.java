@@ -848,7 +848,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.0", GameLauncher.LAUNCHER_VERSION, "version is 0.3.0");
+        eq("0.3.1", GameLauncher.LAUNCHER_VERSION, "version is 0.3.1");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");
