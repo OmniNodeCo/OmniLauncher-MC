@@ -1,5 +1,6 @@
 package com.omninode.omnilauncher.api;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +21,7 @@ import com.omninode.omnilauncher.util.Os;
 public class NewsService {
 
     public static final String NEWS_URL = "https://launchercontent.mojang.com/v2/news.json";
+    public static final String NEWS_FALLBACK_URL = "https://launchercontent.mojang.com/news.json";
     public static final String CONTENT_BASE = "https://launchercontent.mojang.com";
 
     public record Item(String title, String date, String category, String shortText,
@@ -62,17 +64,34 @@ public class NewsService {
 
     public static void loadBlocking() throws Exception {
         Path cache = Os.cacheDir().resolve("news.json");
+        byte[] body = null;
+        Exception failure = null;
         try {
-            byte[] body = Http.get(NEWS_URL);
-            Files.write(cache, body);
-            staleCache = false;
+            body = Http.get(NEWS_URL);
         } catch (Exception e) {
-            if (!Files.exists(cache)) throw e;
-            staleCache = true;
-            Log.warn("Using cached news: " + e.getMessage());
+            failure = e;
+            try { body = Http.get(NEWS_FALLBACK_URL); } catch (Exception e2) { failure.addSuppressed(e2); }
         }
-        parse(Files.readString(cache, StandardCharsets.UTF_8));
-        loadedAt = System.currentTimeMillis();
+        if (body != null && body.length > 0) {
+            parse(new String(body, StandardCharsets.UTF_8));
+            loadedAt = System.currentTimeMillis();
+            staleCache = false;
+            try {
+                Files.createDirectories(cache.getParent());
+                Files.write(cache, body);
+            } catch (IOException io) {
+                Log.warn("News cache write failed: " + io.getMessage());
+            }
+            return;
+        }
+        if (Files.exists(cache)) {
+            staleCache = true;
+            parse(Files.readString(cache, StandardCharsets.UTF_8));
+            loadedAt = System.currentTimeMillis();
+            Log.warn("News served from cache: " + failure);
+            return;
+        }
+        throw failure != null ? failure : new IOException("News feed unavailable");
     }
 
     /** Ignores the TTL and refetches (used by the UI refresh/retry buttons). */
@@ -81,21 +100,84 @@ public class NewsService {
         loadAsync(onSuccess, onError);
     }
 
+    /**
+     * Parses the Minecraft news API payload. The v2 endpoint returns a bare
+     * array; the legacy endpoint wraps it as {"entries":[...]}. Each entry
+     * carries an HTML {@code text} body (plus optional {@code body}), from
+     * which the short card blurb is derived.
+     */
     public static void parse(String json) {
-        List<Object> arr = Json.parseArray(json);
+        List<Object> arr;
+        try {
+            arr = Json.parseArray(json);
+        } catch (Exception bareArrayFailed) {
+            Map<String, Object> root = Json.parseObject(json);
+            List<Object> entries = root == null ? null : Json.arr(root, "entries");
+            arr = entries == null ? List.of() : entries;
+        }
         List<Item> out = new ArrayList<>();
         for (Object o : arr) {
             Map<String, Object> m = Json.asMap(o);
             if (m == null) continue;
+            String text = Json.str(m, "text", "");
+            if (text.isBlank()) text = Json.str(m, "body", "");
+            String category = Json.str(m, "category", "");
+            if (category.isBlank()) category = Json.str(m, "type", "news");
+            String shortText = Json.str(m, "shortText", "");
+            if (shortText.isBlank()) shortText = summarize(text, 150);
             out.add(new Item(
                     Json.str(m, "title", "Untitled"),
                     Json.str(m, "date", ""),
-                    Json.str(m, "category", "news"),
-                    Json.str(m, "shortText", ""),
-                    Json.str(m, "longText", ""),
+                    category,
+                    shortText,
+                    text,
                     extractImageUrl(m)));
         }
         items = List.copyOf(out);
+    }
+
+    /** Strips an HTML body down to plain text, truncated at a word boundary. */
+    public static String summarize(String html, int max) {
+        String t = stripHtml(html);
+        if (t.length() <= max) return t;
+        int cut = t.lastIndexOf(' ', max);
+        if (cut < max / 2) cut = max;
+        return t.substring(0, cut).trim() + "…";
+    }
+
+    /** Removes tags/scripts/styles and unescapes the entities Mojang uses. */
+    public static String stripHtml(String html) {
+        if (html == null || html.isBlank()) return "";
+        String s = html.replaceAll("(?is)<(script|style)\\b.*?</\\1>", " ");
+        s = s.replaceAll("(?i)<br\\s*/?>", " ");
+        s = s.replaceAll("(?i)</(p|div|li|h[1-6]|tr|blockquote)>", " ");
+        s = s.replaceAll("<[^>]+>", "");
+        s = unescapeEntities(s);
+        return s.replaceAll("\\s+", " ").trim();
+    }
+
+    private static String unescapeEntities(String s) {
+        if (!s.contains("&")) return s;
+        String r = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")
+                .replace("&nbsp;", " ").replace("&hellip;", "…").replace("&mdash;", "—")
+                .replace("&ndash;", "–").replace("&rsquo;", "’").replace("&lsquo;", "‘")
+                .replace("&ldquo;", "“").replace("&rdquo;", "”");
+        StringBuilder sb = new StringBuilder(r.length());
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("&#(x?)([0-9a-fA-F]+);").matcher(r);
+        int copied = 0;
+        while (m.find()) {
+            sb.append(r, copied, m.start());
+            try {
+                int code = Integer.parseInt(m.group(2), m.group(1).isEmpty() ? 10 : 16);
+                if (code > 0 && code < Character.MAX_VALUE) sb.append((char) code);
+            } catch (NumberFormatException ignored) {
+                sb.append(m.group());
+            }
+            copied = m.end();
+        }
+        sb.append(r, copied, r.length());
+        return sb.toString();
     }
 
     private static String extractImageUrl(Map<String, Object> m) {

@@ -132,13 +132,18 @@ public final class SelfTest {
     """;
 
     private static final String NEWS_JSON = """
-    [
-      { "title": "Big Update", "date": "2026-07-28T09:41:00+00:00", "category": "release",
-        "shortText": "Short", "longText": "<p>Long body</p>",
-        "image": { "url": "https://launchercontent.mojang.com/v2/images/x.jpg" } },
-      { "title": "Relative Image", "date": "2026-08-01T00:00:00+00:00", "category": "snapshot",
-        "shortText": "s2", "longText": "l2", "image": "/v2/images/y.jpg" }
-    ]
+    { "entries": [
+      { "id": "minecraft-java-mounts-of-mayhem", "title": "Mounts of Mayhem",
+        "type": "patch_notes", "category": "",
+        "text": "<p>Saddle up! Trials &amp; tribulations await in <strong>Mounts of Mayhem</strong>.</p><p>Second paragraph with more patch note details.</p>",
+        "image": "images/2026-mounts-of-mayhem-art.jpg",
+        "date": "2026-07-28T09:41:00+00:00", "language": "en-us", "version": "1.21.9" },
+      { "id": "deep-dive-copper", "title": "Relative Image",
+        "type": "deep_dive", "category": "snapshot",
+        "text": "The copper golem sorts your chests while the shelf stores your leftovers and this gentle news body keeps drifting well past the one hundred and fifty character summary cut so truncation is genuinely exercised.",
+        "image": { "url": "/v2/images/y.jpg" },
+        "date": "2026-08-01T00:00:00+00:00", "language": "en-us" }
+    ] }
     """;
 
     /* --------------------------------------------------------------- run */
@@ -300,12 +305,27 @@ public final class SelfTest {
     }
 
     private static void newsTests() {
-        NewsService.parse(NEWS_JSON);
+        NewsService.parse(NEWS_JSON); // {"entries":[...]} wrapper, as the Mojang news API returns
         eq(2, NewsService.items().size(), "news count");
-        eq("Big Update", NewsService.items().get(0).title(), "news title");
+        eq("Mounts of Mayhem", NewsService.items().get(0).title(), "news title");
+        eq("Saddle up! Trials & tribulations await in Mounts of Mayhem. Second paragraph with more patch note details.",
+                NewsService.items().get(0).shortText(), "news shortText derived from HTML text");
+        eq(true, NewsService.items().get(0).longText().startsWith("<p>Saddle up!")
+                && NewsService.items().get(0).longText().endsWith("</p>"),
+                "news longText keeps raw HTML");
+        eq("patch_notes", NewsService.items().get(0).category(), "news category falls back to type");
+        eq("https://launchercontent.mojang.com/images/2026-mounts-of-mayhem-art.jpg",
+                NewsService.items().get(0).imageUrl(), "news relative string image resolved");
         eq("https://launchercontent.mojang.com/v2/images/y.jpg",
-                NewsService.items().get(1).imageUrl(), "news relative image resolved");
+                NewsService.items().get(1).imageUrl(), "news map image resolved");
+        var blurb = NewsService.items().get(1).shortText();
+        eq(true, blurb.length() <= 151 && blurb.endsWith("…"), "news blurb truncated at word boundary");
         eq(true, NewsService.items().get(0).formattedDate().contains("2026"), "news date format");
+        NewsService.parse("[{ \"title\": \"Bare\", \"date\": \"2026-08-02\", \"text\": \"<b>hi</b> &amp; bye\" }]");
+        eq(1, NewsService.items().size(), "news bare array accepted");
+        eq("hi & bye", NewsService.items().get(0).shortText(), "news bare array text stripped");
+        eq("news", NewsService.items().get(0).category(), "news bare array category default");
+        NewsService.parse(NEWS_JSON); // restore wrapped fixture for any later readers
     }
 
     private static void authShapeTests() {
