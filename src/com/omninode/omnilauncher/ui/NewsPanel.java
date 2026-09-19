@@ -186,8 +186,19 @@ public class NewsPanel extends JPanel {
         back.setFont2(Theme.semi(12f));
         back.setAlignmentY(0.5f);
         back.onClick(() -> cards.show(this, "list"));
+        RButton copy = new RButton("Copy text", RButton.Kind.GHOST);
+        copy.setFont2(Theme.semi(12f));
+        copy.setAlignmentY(0.5f);
+        copy.onClick(() -> {
+            var selection = new java.awt.datatransfer.StringSelection(
+                    NewsService.articlePlainText(item));
+            java.awt.Toolkit.getDefaultToolkit()
+                    .getSystemClipboard().setContents(selection, null);
+        });
         headerRow.add(Box.createHorizontalGlue());
         headerRow.add(back);
+        headerRow.add(Box.createHorizontalStrut(10));
+        headerRow.add(copy);
         headerRow.add(Box.createHorizontalGlue());
         inner.add(headerRow, gc);
 
@@ -207,20 +218,14 @@ public class NewsPanel extends JPanel {
         title.setForeground(Theme.TEXT);
         inner.add(title, gc);
 
+        // one full image, once, at the top (the feed's two assets are the
+        // same artwork in different crops — loading both showed it twice)
         String banner = item.detailImageUrl() != null ? item.detailImageUrl() : item.imageUrl();
         if (banner != null) {
             gc.gridy++;
             var img = new DetailImage(item);
             gc.insets = new Insets(0, 28, 16, 28);
             inner.add(img, gc);
-        }
-        // the second art asset (card image) is part of the entry's content —
-        // show it as an inline figure when it differs from the banner
-        if (item.imageUrl() != null && !item.imageUrl().equals(banner)) {
-            gc.gridy++;
-            var fig = new InlineImage(item);
-            gc.insets = new Insets(0, 28, 16, 28);
-            inner.add(fig, gc);
         }
 
         gc.gridy++;
@@ -291,36 +296,6 @@ public class NewsPanel extends JPanel {
             }
             g.setClip(null);
             g.setColor(Theme.withAlpha(Theme.STROKE_SOFT, 140));
-            g.draw(shape);
-        }
-    }
-
-    /** Inline in-article figure (the entry's card art). */
-    private static class InlineImage extends JComponent {
-        private final NewsService.Item item;
-        private Image image;
-
-        InlineImage(NewsService.Item item) {
-            this.item = item;
-            setPreferredSize(new Dimension(480, 320));
-            setOpaque(false);
-            ImageLoader.load(item.imageUrl(), img -> { image = img; repaint(); });
-        }
-
-        @Override protected void paintComponent(Graphics g0) {
-            Graphics2D g = (Graphics2D) g0;
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            var shape = new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12);
-            g.setClip(shape);
-            Image img = image != null ? image : Icons.newsPlaceholder(getWidth(), getHeight(), item.title());
-            int iw = img.getWidth(null), ih = img.getHeight(null);
-            if (iw > 0 && ih > 0) {
-                double scale = Math.max(getWidth() / (double) iw, getHeight() / (double) ih);
-                g.drawImage(img, (getWidth() - (int) (iw * scale)) / 2, (getHeight() - (int) (ih * scale)) / 2,
-                        (int) (iw * scale), (int) (ih * scale), null);
-            }
-            g.setClip(null);
-            g.setColor(Theme.withAlpha(Theme.STROKE_SOFT, 160));
             g.draw(shape);
         }
     }

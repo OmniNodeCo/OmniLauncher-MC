@@ -188,24 +188,40 @@ public class NewsService {
         return e.replace("\r\n", "\n").replace("\n", "<br>");
     }
 
-    /** Strips an HTML body down to plain text, truncated at a word boundary. */
+    /** Strips an HTML body down to a single-line plain text, truncated at a word boundary. */
     public static String summarize(String html, int max) {
-        String t = stripHtml(html);
+        String t = stripHtml(html).replaceAll("\\s+", " ");
         if (t.length() <= max) return t;
         int cut = t.lastIndexOf(' ', max);
         if (cut < max / 2) cut = max;
         return t.substring(0, cut).trim() + "…";
     }
 
-    /** Removes tags/scripts/styles and unescapes the entities Mojang uses. */
+    /**
+     * The article as readable plain text: paragraphs preserved, tags and
+     * entities resolved — used for the reader's "Copy text" button.
+     */
+    public static String articlePlainText(Item it) {
+        return stripHtml(it.longText() == null ? "" : it.longText());
+    }
+
+    /**
+     * Removes tags/scripts/styles and unescapes the entities Mojang uses.
+     * Block-level boundaries become paragraph breaks so the result reads
+     * like the original article instead of one melted line.
+     */
     public static String stripHtml(String html) {
         if (html == null || html.isBlank()) return "";
         String s = html.replaceAll("(?is)<(script|style)\\b.*?</\\1>", " ");
-        s = s.replaceAll("(?i)<br\\s*/?>", " ");
-        s = s.replaceAll("(?i)</(p|div|li|h[1-6]|tr|blockquote)>", " ");
+        s = s.replaceAll("(?i)<br\\s*/?>", "\n");
+        s = s.replaceAll("(?i)</(p|div|li|h[1-6]|tr|blockquote)>", "\n\n");
+        s = s.replaceAll("(?i)<li\\b[^>]*>", "\u2022 ");
         s = s.replaceAll("<[^>]+>", "");
         s = unescapeEntities(s);
-        return s.replaceAll("\\s+", " ").trim();
+        s = s.replaceAll("[^\\S\\n]+", " ");          // collapse spaces/tabs, keep newlines
+        s = s.replaceAll(" *\n *", "\n");              // trim around newlines
+        s = s.replaceAll("\n{3,}", "\n\n");            // max one blank line
+        return s.trim();
     }
 
     private static String unescapeEntities(String s) {

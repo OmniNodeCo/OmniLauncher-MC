@@ -341,6 +341,8 @@ public final class SelfTest {
         eq(true, doc.contains("<a href=\"https://www.minecraft.net/about-dungeons-ii?OCID=Launcher\">")
                 && doc.contains("Read the full article on minecraft.net"), "article has read-more link");
         eq(true, doc.endsWith("</body></html>"), "article document is well formed");
+        eq("Journey into the Sift to explore uncharted lands and fight unfamiliar threats.",
+                NewsService.articlePlainText(NewsService.items().get(0)), "article plain text of plain entry");
         // plain text with stray inline markup stays plain: escaped, newlines kept,
         // blank lines split paragraphs, no link when the entry has none
         NewsService.parse("""
@@ -360,6 +362,13 @@ public final class SelfTest {
         eq("<p>rich body</p>", NewsService.items().get(0).longText(), "news articleBody preferred");
         eq(true, NewsService.buildArticleHtml(NewsService.items().get(0)).contains("<p>rich body</p>"),
                 "article keeps rich HTML verbatim");
+        NewsService.parse("""
+            { "entries": [ { "title": "Fmt", "date": "2026-08-03", "category": "Minecraft: Java Edition",
+              "articleBody": "<p>one</p><p>two</p><ul><li>bullet</li></ul>" } ] }
+            """);
+        eq("one\n\ntwo\n\n\u2022 bullet",
+                NewsService.articlePlainText(NewsService.items().get(0)), "article plain text keeps paragraphs and bullets");
+        eq("a b", NewsService.summarize("<p>a</p><p>b</p>", 150), "card blurb stays single-line");
         // legacy bare-array payloads still parse
         NewsService.parse("[{ \"title\": \"Bare\", \"date\": \"2026-08-02\", \"text\": \"<b>hi</b> &amp; bye\" }]");
         eq(1, NewsService.items().size(), "news bare array accepted");
@@ -896,7 +905,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.3", GameLauncher.LAUNCHER_VERSION, "version is 0.3.3");
+        eq("0.3.4", GameLauncher.LAUNCHER_VERSION, "version is 0.3.4");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");
