@@ -25,7 +25,8 @@ public class NewsService {
     public static final String CONTENT_BASE = "https://launchercontent.mojang.com";
 
     public record Item(String title, String date, String category, String shortText,
-                       String longText, String imageUrl, String detailImageUrl) {
+                       String longText, String imageUrl, String detailImageUrl,
+                       String readMoreUrl) {
         public String formattedDate() {
             try {
                 var d = java.time.LocalDate.parse(date.substring(0, 10));
@@ -134,9 +135,57 @@ public class NewsService {
                     shortText,
                     longText,
                     extractImageUrl(m, "image", "playPageImage", "newsPageImage"),
-                    extractImageUrl(m, "newsPageImage", "image", "playPageImage")));
+                    extractImageUrl(m, "newsPageImage", "image", "playPageImage"),
+                    normalizeUrl(Json.str(m, "readMoreLink", ""))));
         }
         items = List.copyOf(out);
+    }
+
+    /** Absolute-ifies a link that may be protocol-relative or root-relative. */
+    private static String normalizeUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        if (url.startsWith("//")) return "https:" + url;
+        if (url.startsWith("http")) return url;
+        if (url.startsWith("/")) return CONTENT_BASE + url;
+        return url;
+    }
+
+    /**
+     * Builds the full blog-style article document for the reader page: the
+     * complete body (raw HTML when the feed provides markup, otherwise plain
+     * text escaped and split into paragraphs) plus a "read more" link when
+     * the entry has one. Images are composed by the UI around this document.
+     */
+    public static String buildArticleHtml(Item it) {
+        StringBuilder sb = new StringBuilder("<html><body>");
+        String body = it.longText() == null ? "" : it.longText().trim();
+        if (looksLikeHtml(body)) {
+            sb.append(body);
+        } else if (!body.isEmpty()) {
+            for (String para : body.split("\\n\\s*\\n+")) {
+                if (para.isBlank()) continue;
+                sb.append("<p>").append(escapeAndBreaks(para.trim())).append("</p>");
+            }
+        }
+        if (it.readMoreUrl() != null && !it.readMoreUrl().isBlank()) {
+            sb.append("<p style=\"margin-top:14px\"><a href=\"").append(it.readMoreUrl())
+              .append("\">Read the full article on minecraft.net &#8599;</a></p>");
+        }
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    private static boolean looksLikeHtml(String s) {
+        return s != null && s.length() > 3 && s.chars().anyMatch(c -> c == '<')
+                && java.util.regex.Pattern
+                        .compile("<\\s*(p|div|ul|ol|li|h[1-6]|table|thead|tbody|blockquote|img)\\b",
+                                java.util.regex.Pattern.CASE_INSENSITIVE)
+                        .matcher(s).find();
+    }
+
+    private static String escapeAndBreaks(String s) {
+        String e = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return e.replace("\r\n", "\n").replace("\n", "<br>");
     }
 
     /** Strips an HTML body down to plain text, truncated at a word boundary. */

@@ -324,6 +324,8 @@ public final class SelfTest {
                 NewsService.items().get(0).imageUrl(), "news card image from playPageImage");
         eq("https://launchercontent.mojang.com/v2/images/MCD2MinecraftLauncher772x350.png",
                 NewsService.items().get(0).detailImageUrl(), "news banner image from newsPageImage");
+        eq("https://www.minecraft.net/about-dungeons-ii?OCID=Launcher",
+                NewsService.items().get(0).readMoreUrl(), "news readMoreLink parsed");
         eq(true, NewsService.items().get(0).formattedDate().startsWith("August")
                 && NewsService.items().get(0).formattedDate().contains("2026"), "news date format");
         eq("https://launchercontent.mojang.com/v2/images/y.jpg",
@@ -332,12 +334,32 @@ public final class SelfTest {
                 NewsService.items().get(1).detailImageUrl(), "news detail falls back to card image");
         var blurb = NewsService.items().get(1).shortText();
         eq(true, blurb.length() <= 151 && blurb.endsWith("…"), "news blurb truncated at word boundary");
-        // articleBody preferred for the reader when present
+        // full-blog article document: plain text becomes paragraphs + read-more link
+        var doc = NewsService.buildArticleHtml(NewsService.items().get(0));
+        eq(true, doc.startsWith("<html><body><p>Journey into the Sift")
+                && doc.contains("fight unfamiliar threats.</p>"), "article plain text becomes a paragraph");
+        eq(true, doc.contains("<a href=\"https://www.minecraft.net/about-dungeons-ii?OCID=Launcher\">")
+                && doc.contains("Read the full article on minecraft.net"), "article has read-more link");
+        eq(true, doc.endsWith("</body></html>"), "article document is well formed");
+        // plain text with stray inline markup stays plain: escaped, newlines kept,
+        // blank lines split paragraphs, no link when the entry has none
+        NewsService.parse("""
+            { "entries": [ { "title": "Esc", "date": "2026-08-02", "category": "Minecraft: Java Edition",
+              "text": "A & B <br> real newline kept\nsecond line\n\nsecond paragraph" } ] }
+            """);
+        var escDoc = NewsService.buildArticleHtml(NewsService.items().get(0));
+        eq(true, escDoc.contains("A &amp; B &lt;br&gt; real newline kept<br>second line</p>"),
+                "article escapes tags and keeps single newlines");
+        eq(true, escDoc.contains("<p>second paragraph</p>"), "article splits blank-line paragraphs");
+        eq(false, escDoc.contains("Read the full article"), "article omits link when absent");
+        // rich articleBody is preferred and passed through untouched
         NewsService.parse("""
             { "entries": [ { "title": "Rich", "date": "2026-08-02", "category": "Minecraft: Java Edition",
               "text": "plain", "articleBody": "<p>rich body</p>" } ] }
             """);
         eq("<p>rich body</p>", NewsService.items().get(0).longText(), "news articleBody preferred");
+        eq(true, NewsService.buildArticleHtml(NewsService.items().get(0)).contains("<p>rich body</p>"),
+                "article keeps rich HTML verbatim");
         // legacy bare-array payloads still parse
         NewsService.parse("[{ \"title\": \"Bare\", \"date\": \"2026-08-02\", \"text\": \"<b>hi</b> &amp; bye\" }]");
         eq(1, NewsService.items().size(), "news bare array accepted");
@@ -874,7 +896,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.2", GameLauncher.LAUNCHER_VERSION, "version is 0.3.2");
+        eq("0.3.3", GameLauncher.LAUNCHER_VERSION, "version is 0.3.3");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");
