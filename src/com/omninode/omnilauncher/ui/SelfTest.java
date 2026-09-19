@@ -362,6 +362,8 @@ public final class SelfTest {
         eq("<p>rich body</p>", NewsService.items().get(0).longText(), "news articleBody preferred");
         eq(true, NewsService.buildArticleHtml(NewsService.items().get(0)).contains("<p>rich body</p>"),
                 "article keeps rich HTML verbatim");
+
+        javaLookupTests();
         NewsService.parse("""
             { "entries": [ { "title": "Fmt", "date": "2026-08-03", "category": "Minecraft: Java Edition",
               "articleBody": "<p>one</p><p>two</p><ul><li>bullet</li></ul>" } ] }
@@ -383,6 +385,47 @@ public final class SelfTest {
         eq(true, a.getFileName().toString().matches("[0-9a-f]+-MCD2_700x466\\.png"), "image cache name safe");
         eq(true, c.getFileName().toString().matches("[0-9a-f]+-[A-Za-z0-9._-]+"), "image cache strips query chars");
         NewsService.parse(NEWS_JSON); // restore wrapped fixture for any later readers
+    }
+
+    private static void javaLookupTests() {
+        var os = Os.of(Os.Family.LINUX, "x64");
+        var sep = java.io.File.pathSeparator;
+        // PATH entries are now searched explicitly (the old lookup probed the
+        // bare name against the current directory, missing PATH installs)
+        var cands = GameLauncher.javaCandidates(null, "/jh", "/a" + sep + "/b" + sep + sep + "/c",
+                os, "/runner/jre", null);
+        eq("/jh/bin/java", cands.get(0).toString(), "java candidate: JAVA_HOME first");
+        eq(true, cands.contains(Path.of("/a/java")) && cands.contains(Path.of("/b/java"))
+                && cands.contains(Path.of("/c/java")), "java candidate: PATH dirs expanded");
+        eq(true, cands.contains(Path.of("/runner/jre/bin/java")), "java candidate: launcher runtime");
+        eq(true, cands.contains(Path.of("/usr/lib/jvm")) == false, "java candidate: dirs not added raw");
+        // bundled runtime layout per OS (jpackage app-path)
+        var win = GameLauncher.javaCandidates(null, null, "", Os.of(Os.Family.WINDOWS, "x64"), null,
+                "/install/OmniLauncher.exe");
+        eq(true, win.contains(Path.of("/install/runtime/bin/java.exe")),
+                "java candidate: windows bundled runtime");
+        var mac = GameLauncher.javaCandidates(null, null, "", Os.of(Os.Family.MACOS, "x64"), null,
+                "/Applications/OmniLauncher.app/Contents/MacOS/OmniLauncher");
+        eq(true, mac.contains(Path.of("/Applications/OmniLauncher.app/Contents/PlugIns/runtime/Contents/Home/bin/java")),
+                "java candidate: mac bundled runtime");
+        // explicit override: an existing directory resolves to its java binary
+        Path tmpJdk;
+        try { tmpJdk = java.nio.file.Files.createTempDirectory("omni-jdk-test"); }
+        catch (java.io.IOException e) { throw new RuntimeException(e); }
+        var ov = GameLauncher.javaCandidates(tmpJdk.toString(), null, "", os, null, null);
+        eq(tmpJdk.resolve("bin").resolve("java").toString(), ov.get(0).toString(),
+                "java candidate: dir override resolved");
+        // a selected javaw.exe is swapped for the console java next to it
+        var ovw = GameLauncher.javaCandidates("/c/Java/javaw.exe", null, "",
+                Os.of(Os.Family.WINDOWS, "x64"), null, null);
+        eq("/c/Java/java.exe", ovw.get(0).toString(), "java candidate: javaw swapped to java");
+        // best runtime wins (an old PATH entry must not shadow a newer install)
+        eq(null, GameLauncher.pickBest(List.of()), "java pick: empty");
+        eq(21, GameLauncher.pickBest(List.of(new GameLauncher.JavaRuntime(Path.of("/a"), 17),
+                new GameLauncher.JavaRuntime(Path.of("/b"), 21))).major(), "java pick: highest major");
+        eq("/first", GameLauncher.pickBest(List.of(new GameLauncher.JavaRuntime(Path.of("/first"), 17),
+                new GameLauncher.JavaRuntime(Path.of("/second"), 17))).javaExe().toString(),
+                "java pick: tie keeps first");
     }
 
     private static void authShapeTests() {
@@ -905,7 +948,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.4", GameLauncher.LAUNCHER_VERSION, "version is 0.3.4");
+        eq("0.3.5", GameLauncher.LAUNCHER_VERSION, "version is 0.3.5");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");

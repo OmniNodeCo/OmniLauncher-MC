@@ -1,10 +1,12 @@
 package com.omninode.omnilauncher.core;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -17,7 +19,7 @@ import com.omninode.omnilauncher.util.Os;
 public class GameLauncher {
 
     public static final String LAUNCHER_NAME = "OmniLauncher";
-    public static final String LAUNCHER_VERSION = "0.3.4";
+    public static final String LAUNCHER_VERSION = "0.3.5";
 
     public record JavaRuntime(Path javaExe, int major) {}
 
@@ -248,43 +250,111 @@ public class GameLauncher {
         JavaRuntime c = cached;
         if (c != null) return c;
         Settings s = Settings.get();
-        List<Path> candidates = new ArrayList<>();
-        if (s.javaPath != null && !s.javaPath.isBlank()) {
-            Path p = Path.of(s.javaPath);
-            if (Files.isDirectory(p)) p = p.resolve(javaBinary());
-            candidates.add(p);
+        List<Path> candidates = javaCandidates(
+                s.javaPath == null || s.javaPath.isBlank() ? null : s.javaPath,
+                System.getenv("JAVA_HOME"), System.getenv("PATH"), Os.get(),
+                System.getProperty("java.home"), System.getProperty("jpackage.app-path"));
+        List<JavaRuntime> probed = new ArrayList<>();
+        for (Path p : candidates) {
+            if (p == null || !Files.isRegularFile(p) || !Files.isExecutable(p)) continue;
+            int major = probeJavaMajor(p);
+            if (major >= 8) probed.add(new JavaRuntime(p.toAbsolutePath(), major));
         }
-        String javaHome = System.getenv("JAVA_HOME");
-        if (javaHome != null && !javaHome.isBlank())
-            candidates.add(Path.of(javaHome, "bin", javaBinary()));
-        candidates.add(Path.of(javaBinary())); // PATH
-        if (Os.get().family == Os.Family.MACOS) {
+        JavaRuntime best = pickBest(probed);
+        if (best != null) cached = best;
+        return best;
+    }
+
+    /** Highest-versioned runtime wins; ties keep the earlier (preferred) candidate. */
+    public static JavaRuntime pickBest(List<JavaRuntime> probed) {
+        JavaRuntime best = null;
+        for (JavaRuntime rt : probed) {
+            if (best == null || rt.major() > best.major()) best = rt;
+        }
+        return best;
+    }
+
+    /**
+     * Ordered candidate java executables. Package-visible for tests.
+     *
+     * The old lookup relied on {@code Files.isExecutable("java")}, which does
+     * NOT consult PATH (it only checks the current directory) — so Java
+     * installed but only reachable via PATH was reported as missing. PATH is
+     * now searched explicitly, the launcher's own bundled runtime is a
+     * candidate, and more vendor directories are covered.
+     */
+    public static List<Path> javaCandidates(String override, String javaHome, String pathEnv,
+                                     Os os, String runningJavaHome, String appPath) {
+        String bin = os.isWindows() ? "java.exe" : "java";
+        LinkedHashSet<Path> out = new LinkedHashSet<>();
+        if (override != null && !override.isBlank()) {
+            Path p = Path.of(override);
+            if (Files.isDirectory(p)) {
+                p = p.resolve("bin").resolve(bin);
+            } else if (p.getFileName() != null
+                    && p.getFileName().toString().toLowerCase().startsWith("javaw")) {
+                p = p.getParent() == null ? p : p.getParent().resolve(bin); // javaw has no console
+            }
+            out.add(p);
+        }
+        if (javaHome != null && !javaHome.isBlank()) out.add(Path.of(javaHome, "bin", bin));
+        for (Path dir : pathEntries(pathEnv)) out.add(dir.resolve(bin));
+        // the JRE the launcher itself runs on (jpackage bundles one inside the install)
+        if (runningJavaHome != null && !runningJavaHome.isBlank())
+            out.add(Path.of(runningJavaHome, "bin", bin));
+        if (appPath != null && !appPath.isBlank()) {
+            Path dir = Path.of(appPath).toAbsolutePath().getParent();
+            if (dir != null) {
+                if (os.family == Os.Family.MACOS) {
+                    // …/OmniLauncher.app/Contents/MacOS/<bin> → Contents/PlugIns/runtime/Contents/Home
+                    out.add(dir.resolveSibling("PlugIns").resolve("runtime")
+                            .resolve("Contents").resolve("Home").resolve("bin").resolve(bin));
+                } else if (!os.isWindows()) {
+                    // …/OmniLauncher/bin/<bin> → …/lib/runtime/bin (app-image layout)
+                    if (dir.getParent() != null)
+                        out.add(dir.getParent().resolve("lib").resolve("runtime").resolve("bin").resolve(bin));
+                } else {
+                    // …\OmniLauncher\<bin> → …\runtime\bin (jpackage exe layout)
+                    out.add(dir.resolve("runtime").resolve("bin").resolve(bin));
+                }
+            }
+        }
+        if (os.family == Os.Family.MACOS) {
             for (String home : new String[]{"/Library/Java/JavaVirtualMachines",
                     System.getProperty("user.home") + "/Library/Java/JavaVirtualMachines"}) {
-                candidates.addAll(globJavaCandidates(Path.of(home), "*/Contents/Home/bin/" + javaBinary()));
+                out.addAll(globJavaCandidates(Path.of(home), "*/Contents/Home/bin/" + bin));
             }
-        }
-        if (Os.get().isWindows()) {
+            out.add(Path.of("/opt/homebrew/opt/openjdk/bin", bin));
+            out.add(Path.of("/usr/local/opt/openjdk/bin", bin));
+            out.add(Path.of("/usr/bin", bin));
+        } else if (os.isWindows()) {
             for (String dir : new String[]{"C:/Program Files/Java", "C:/Program Files (x86)/Java",
-                    "C:/Program Files/Eclipse Adoptium", System.getenv("LOCALAPPDATA") + "/Programs/Java"}) {
+                    "C:/Program Files/Eclipse Adoptium", "C:/Program Files/Microsoft",
+                    "C:/Program Files/Amazon Corretto", "C:/Program Files/Zulu",
+                    "C:/Program Files/BellSoft", "C:/Program Files/Semeru",
+                    System.getenv("LOCALAPPDATA") + "/Programs/Java"}) {
                 if (dir == null) continue;
-                candidates.addAll(globJavaCandidates(Path.of(dir), "*/bin/" + javaBinary()));
+                out.addAll(globJavaCandidates(Path.of(dir), "*/bin/" + bin));
             }
         } else {
-            for (String dir : new String[]{"/usr/lib/jvm", "/opt", System.getProperty("user.home") + "/.sdkman/candidates/java"}) {
-                candidates.addAll(globJavaCandidates(Path.of(dir), "*/bin/" + javaBinary()));
+            for (String dir : new String[]{"/usr/lib/jvm", "/usr/java", "/opt", "/opt/java",
+                    System.getProperty("user.home") + "/.sdkman/candidates/java",
+                    System.getProperty("user.home") + "/.jdks"}) {
+                out.addAll(globJavaCandidates(Path.of(dir), "*/bin/" + bin));
             }
         }
-        for (Path p : candidates) {
-            if (p == null || !Files.isExecutable(p)) continue;
-            int major = probeJavaMajor(p);
-            if (major >= 8) {
-                JavaRuntime rt = new JavaRuntime(p, major);
-                cached = rt;
-                return rt;
-            }
+        out.removeIf(java.util.Objects::isNull);
+        return new ArrayList<>(out);
+    }
+
+    /** Splits a PATH-style environment value into its directory entries. */
+    static List<Path> pathEntries(String pathEnv) {
+        List<Path> out = new ArrayList<>();
+        if (pathEnv == null || pathEnv.isBlank()) return out;
+        for (String e : pathEnv.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (!e.isBlank()) out.add(Path.of(e));
         }
-        return null;
+        return out;
     }
 
     private static String javaBinary() {
