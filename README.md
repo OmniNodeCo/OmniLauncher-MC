@@ -55,7 +55,8 @@ PNG, Windows `.ico` and macOS `.icns` on the fly:
 ```bash
 ./scripts/package.sh              # best bundle for the current OS
 ./scripts/package.sh app-image    # plain runnable folder
-./scripts/package.sh exe          # Windows installer (auto-falls back to msi)
+./scripts/package.sh exe          # Windows custom installer (Inno Setup, no MSI)
+./scripts/package.sh msi          # Windows MSI via jpackage/WiX (optional)
 ./scripts/package.sh dmg          # macOS
 ./scripts/package.sh deb|rpm      # Linux packages
 ```
@@ -75,12 +76,14 @@ uninstalling never touches your accounts, settings or downloaded versions:
 | macOS | `~/Library/Application Support/OmniLauncher` |
 | Linux | `~/.config/omnilauncher` |
 
-- **Windows** — run the new installer over the old install: the MSI removes
-  the previously installed OmniLauncher from the same folder first
-  (`RemoveExistingProducts`, upgrades *and* downgrades allowed), then installs
-  the new version in its place. Uninstall via *Apps & features* and re-run any
-  installer to reinstall. (Re-running the exact same version reports
-  "already installed" — that's a Windows Installer rule; remove it first.)
+- **Windows** — the installer is a **custom setup EXE** (Inno Setup — no MSI
+  involved). It ships a modern wizard with the OmniLauncher icon, an optional
+  desktop shortcut and a launch-after-setup checkbox. Because the product id
+  is fixed, running a new installer **removes the previously installed
+  OmniLauncher first and installs the new version into the same folder**
+  (default `C:\Program Files\OmniLauncher`) — even same-version re-installs
+  just work. Uninstall via *Apps & features* or the Start-menu entry; your
+  data in `%APPDATA%\OmniLauncher` is never touched.
 - **macOS** — the dmg shows a drag-to-Applications layout; when an older copy
   is installed, choose **Replace** at the prompt.
 - **Linux** — install the new package over the old one

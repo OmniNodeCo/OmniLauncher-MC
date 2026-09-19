@@ -50,13 +50,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # jpackage needs WiX 3 (candle/light) on PATH to build exe/msi bundles
-      - name: Install WiX toolset
+      # the custom exe installer needs Inno Setup 6 (ISCC); preinstalled on
+      # runner images, installed via choco when missing
+      - name: Install Inno Setup
         if: matrix.type == 'exe'
         shell: pwsh
         run: |
-          choco install wixtoolset --no-progress -y
-          Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\WiX Toolset v3.14\bin'
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
 
       # jpackage needs rpmbuild for --type rpm
       - name: Install rpm tooling
