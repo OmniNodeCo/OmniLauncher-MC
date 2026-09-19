@@ -120,7 +120,7 @@ public class Settings {
 
     public void save() {
         try {
-            Files.writeString(Os.settingsFile(), Json.write(toMap()));
+            Os.atomicWriteString(Os.settingsFile(), Json.write(toMap()));
         } catch (Exception e) {
             Log.error("Could not save settings", e);
         }

@@ -112,6 +112,22 @@ public final class Os {
     public static Path accountsFile() { return dataDir().resolve("accounts.json"); }
     public static Path settingsFile() { return dataDir().resolve("settings.json"); }
 
+    /**
+     * Writes text atomically: to a sibling temp file first, then moved into
+     * place. A crash mid-write can no longer truncate settings or accounts.
+     */
+    public static void atomicWriteString(Path target, String content) throws IOException {
+        Files.createDirectories(target.getParent());
+        Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
+        Files.writeString(tmp, content);
+        try {
+            Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException amnse) {
+            Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
     private static Path dir(Path base, String child) {
         Path p = base.resolve(child);
         try { Files.createDirectories(p); } catch (IOException ignored) {}

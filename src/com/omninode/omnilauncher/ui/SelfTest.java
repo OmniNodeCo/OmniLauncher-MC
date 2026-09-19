@@ -948,7 +948,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.5", GameLauncher.LAUNCHER_VERSION, "version is 0.3.5");
+        eq("0.3.6", GameLauncher.LAUNCHER_VERSION, "version is 0.3.6");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");
@@ -966,7 +966,11 @@ public final class SelfTest {
         int declared = ((icns[4] & 0xFF) << 24) | ((icns[5] & 0xFF) << 16)
                 | ((icns[6] & 0xFF) << 8) | (icns[7] & 0xFF);
         eq(icns.length, declared, "icon: icns declared size matches");
-        eq(10, written.size(), "icon: export map size");
+        eq(11, written.size(), "icon: export map size");
+        String svg = Files.readString(written.get("svg"));
+        eq(true, svg.startsWith("<svg") && svg.contains("</svg>"), "icon: svg document");
+        eq(true, svg.contains("viewBox=\"0 0 512 512\"") && svg.contains("#7cb342"),
+                "icon: svg brand geometry");
     }
 
     /* ------------------------------------------------------------ assert */

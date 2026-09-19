@@ -74,7 +74,7 @@ public class NavRail extends JComponent {
         g.fillRect(0, 0, getWidth(), getHeight());
 
         // brand block
-        g.drawImage(Icons.grassBlock(40), (WIDTH - 40) / 2, 8, 40, 40, null);
+        g.drawImage(Icons.brandBadge(40), (WIDTH - 40) / 2, 8, 40, 40, null);
 
         Image[] glyphs = {
                 Icons.glyph(Glyph.PLAY, 20, iconColor(0)),

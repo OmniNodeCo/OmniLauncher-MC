@@ -12,8 +12,9 @@ import javax.imageio.ImageIO;
 
 /**
  * Writes the launcher artwork as real icon files used by the native
- * packages: multi-size PNGs, a Windows .ico (PNG-compressed entries) and a
- * macOS .icns — all rendered from the procedural grass block, no binaries
+ * packages: multi-size PNGs, a Windows .ico (PNG-compressed entries), a
+ * macOS .icns and a resolution-independent SVG — all rendered from the
+ * procedural brand badge, no binaries
  * in the repo.
  */
 public final class IconExporter {
@@ -43,11 +44,15 @@ public final class IconExporter {
         Path icns = dir.resolve("OmniLauncher.icns");
         Files.write(icns, buildIcns(pngs));
         written.put("icns", icns);
+
+        Path svg = dir.resolve("OmniLauncher.svg");
+        Files.writeString(svg, brandSvg());
+        written.put("svg", svg);
         return written;
     }
 
     private static byte[] renderPng(int size) throws IOException {
-        java.awt.Image src = Icons.grassBlock(size);
+        java.awt.Image src = Icons.brandBadge(size);
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         var g = img.createGraphics();
         g.drawImage(src, 0, 0, size, size, null);
@@ -59,6 +64,56 @@ public final class IconExporter {
     }
 
     /** ICO container with PNG-compressed entries (valid on Windows Vista+). */
+    /**
+     * Resolution-independent vector version of the brand badge, hand-authored
+     * to mirror the procedural renderer (rounded badge, green glow, isometric
+     * grass block). Used for README/wiki/web branding.
+     */
+    public static String brandSvg() {
+        return """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e3540"/>
+      <stop offset="1" stop-color="#151920"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.55" r="0.6">
+      <stop offset="0" stop-color="#7cb342" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#7cb342" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="26" y="26" width="460" height="460" rx="110" fill="url(#face)"/>
+  <rect x="26" y="26" width="460" height="460" rx="110" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="4"/>
+  <rect x="30" y="30" width="452" height="452" rx="106" fill="none" stroke="#000000" stroke-opacity="0.28" stroke-width="3"/>
+  <ellipse cx="256" cy="295" rx="175" ry="160" fill="url(#glow)"/>
+  <g>
+    <ellipse cx="256" cy="415" rx="150" ry="34" fill="#000000" opacity="0.20"/>
+    <polygon points="256,64 448,169 256,274 64,169" fill="#7cb342"/>
+    <polygon points="256,274 64,169 64,364 256,469" fill="#7a5230"/>
+    <polygon points="256,274 448,169 448,364 256,469" fill="#5d3f26"/>
+    <polygon points="256,64 448,169 256,274 64,169" fill="#ffffff" opacity="0.10"/>
+    <polygon points="256,274 448,169 448,364 256,469" fill="#000000" opacity="0.09"/>
+    <polygon points="64,169 256,274 256,290 64,185" fill="#68a13a"/>
+    <polygon points="256,274 448,169 448,185 256,290" fill="#68a13a"/>
+    <g fill="#8ec954">
+      <rect x="150" y="130" width="22" height="22" transform="skewY(26)" opacity="0.0"/>
+    </g>
+    <g fill="#8ec954" opacity="0.85">
+      <path d="M176 140 l24 13 0 12 -24 -13 z"/>
+      <path d="M300 172 l26 14 0 12 -26 -14 z"/>
+      <path d="M236 190 l20 11 0 11 -20 -11 z"/>
+    </g>
+    <g fill="#5f3d24" opacity="0.7">
+      <path d="M150 260 l26 14 0 24 -26 -14 z"/>
+      <path d="M300 320 l22 12 0 22 -22 -12 z"/>
+      <path d="M215 320 l18 10 0 20 -18 -10 z"/>
+      <path d="M355 255 l20 11 0 20 -20 -11 z"/>
+    </g>
+  </g>
+</svg>
+""";
+    }
+
     private static byte[] buildIco(Map<Integer, byte[]> pngs) {
         int[] sizes = {16, 24, 32, 48, 64, 128, 256};
         var buf = new ByteArrayOutputStream();

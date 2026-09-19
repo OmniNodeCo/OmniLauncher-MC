@@ -163,7 +163,7 @@ public class SettingsPanel extends JPanel {
         column.add(Box.createVerticalStrut(10));
         HoverCard about = section();
         column.add(about);
-        JLabel logo = new JLabel(new javax.swing.ImageIcon(Icons.grassBlock(44)));
+        JLabel logo = new JLabel(new javax.swing.ImageIcon(Icons.brandBadge(44)));
         place(about, logo, 0);
         JLabel aboutText = new JLabel("<html><div style='width:560px'>"
                 + "<b>OmniLauncher " + GameLauncher.LAUNCHER_VERSION + "</b> — a native, "

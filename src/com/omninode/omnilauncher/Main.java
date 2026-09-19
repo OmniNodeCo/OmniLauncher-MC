@@ -1,5 +1,6 @@
 package com.omninode.omnilauncher;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 
@@ -19,8 +20,36 @@ import com.omninode.omnilauncher.util.Os;
 public class Main {
 
     public static void main(String[] args) {
-        Thread.setDefaultUncaughtExceptionHandler((t, e) ->
-                Log.error("Uncaught on " + t.getName(), e));
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            Log.error("Uncaught on " + t.getName(), e);
+            // persist a dedicated crash report so failures are diagnosable
+            // even when the console/log rotation is out of reach
+            try {
+                var stamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+                        .withZone(java.time.ZoneId.systemDefault())
+                        .format(java.time.Instant.now());
+                Path crash = Os.logsDir().resolve("crash-" + stamp + ".log");
+                try (var w = Files.newBufferedWriter(crash)) {
+                    w.write("OmniLauncher " + GameLauncher.LAUNCHER_VERSION
+                            + "  thread: " + t.getName() + "  time: " + stamp + "\n");
+                    w.write(e.toString() + "\n");
+                    for (StackTraceElement el : e.getStackTrace()) w.write("  at " + el + "\n");
+                    if (e.getCause() != null) {
+                        w.write("Caused by: " + e.getCause() + "\n");
+                        for (StackTraceElement el : e.getCause().getStackTrace())
+                            w.write("  at " + el + "\n");
+                    }
+                }
+                try (var s2 = Files.list(Os.logsDir())) {
+                    var old_ = s2.filter(p -> p.getFileName().toString().startsWith("crash-"))
+                            .sorted(java.util.Comparator.comparingLong(p -> p.toFile().lastModified()))
+                            .toList();
+                    for (int i = 0; i < Math.max(0, old_.size() - 10); i++) Files.deleteIfExists(old_.get(i));
+                }
+            } catch (Exception ignored) {
+                // never let crash reporting itself break the app
+            }
+        });
 
         if (args.length > 0) {
             switch (args[0]) {

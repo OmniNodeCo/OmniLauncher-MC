@@ -21,7 +21,7 @@ public class LauncherWindow extends JFrame {
         setLocationRelativeTo(null);
 
         try {
-            var icon = Icons.grassBlock(128);
+            var icon = Icons.brandBadge(128);
             setIconImage(icon);
             if (java.awt.Taskbar.isTaskbarSupported() && java.awt.Taskbar.getTaskbar()
                     .isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {

@@ -45,7 +45,7 @@ public class AccountStore {
                 List<Object> arr = new ArrayList<>();
                 for (Account a : ACCOUNTS) arr.add(a.toMap());
                 root.put("accounts", arr);
-                Files.writeString(Os.accountsFile(), Json.write(root));
+                Os.atomicWriteString(Os.accountsFile(), Json.write(root));
             } catch (Exception e) {
                 Log.error("Could not save accounts", e);
             }

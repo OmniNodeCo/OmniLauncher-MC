@@ -77,6 +77,8 @@ COMMON_ARGS=(
     --description "Native, dependency-free Minecraft launcher"
     --input build/jpackage-input
     --dest build/dist
+    --java-options "-Dawt.useSystemAAFontSettings=on"
+    --java-options "-Dswing.aatext=true"
 )
 
 # stage the jar exactly as jpackage expects (flat input dir)

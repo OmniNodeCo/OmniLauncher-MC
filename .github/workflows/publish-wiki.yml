@@ -1,0 +1,50 @@
+# Publishes docs/wiki/*.md to the GitHub wiki whenever they change.
+#
+# Note: GitHub does not create a wiki's git backend until the first page is
+# created through the web UI (there is no API for it). If the wiki is not
+# initialized yet, this workflow posts a warning and succeeds — just open
+# https://github.com/OmniNodeCo/OmniLauncher-MC/wiki and create the first
+# page once; every later run will sync automatically.
+name: Publish wiki
+
+on:
+  push:
+    paths:
+      - 'docs/wiki/**'
+      - '.github/workflows/publish-wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Sync wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          WIKI="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          if ! git ls-remote --exit-code "$WIKI" HEAD >/dev/null 2>&1; then
+            echo "::warning::Wiki backend does not exist yet. Open the repo's Wiki tab and create the first page once; then re-run this workflow."
+            exit 0
+          fi
+          git config --global user.name "OmniNodeCo"
+          git config --global user.email "omninodeco@users.noreply.github.com"
+          rm -rf /tmp/wiki
+          git clone -q "$WIKI" /tmp/wiki
+          cp docs/wiki/*.md /tmp/wiki/
+          cd /tmp/wiki
+          git add -A
+          if git diff --cached --quiet; then
+            echo "wiki already up to date"
+            exit 0
+          fi
+          git commit -q -m "Sync wiki from docs/wiki (${GITHUB_SHA::7})"
+          git push origin master
+          echo "wiki published"

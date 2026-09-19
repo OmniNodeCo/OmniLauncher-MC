@@ -61,7 +61,7 @@ public class TitleBar extends JComponent {
         g.setColor(Theme.RAIL);
         g.fillRect(0, 0, getWidth(), getHeight());
 
-        var block = Icons.grassBlock(20);
+        var block = Icons.brandBadge(20);
         g.drawImage(block, 14, 11, 20, 20, null);
         g.setFont(Theme.xbold(11.5f));
         g.setColor(Theme.TEXT);

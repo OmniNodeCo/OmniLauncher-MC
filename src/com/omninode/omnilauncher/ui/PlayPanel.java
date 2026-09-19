@@ -99,7 +99,7 @@ public class PlayPanel extends JPanel {
         hero.setLayout(new BoxLayout(hero, BoxLayout.Y_AXIS));
         hero.setAlignmentX(0f);
 
-        javax.swing.JLabel blockIcon = new javax.swing.JLabel(new javax.swing.ImageIcon(Icons.grassBlock(72)));
+        javax.swing.JLabel blockIcon = new javax.swing.JLabel(new javax.swing.ImageIcon(Icons.brandBadge(72)));
         blockIcon.setAlignmentX(0f);
         blockIcon.setBorder(BorderFactory.createEmptyBorder(26, 0, 18, 0));
         blockIcon.setMaximumSize(blockIcon.getPreferredSize());

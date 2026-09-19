@@ -8,7 +8,7 @@ import java.awt.RenderingHints;
 import java.awt.geom.Path2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
 
@@ -20,7 +20,13 @@ public final class Icons {
         MAXIMIZE, BACK, EXTERNAL, DOWNLOAD, STOP, CHECK, CHEVRON_DOWN, TRASH, COPY
     }
 
-    private static final Map<String, Image> CACHE = new HashMap<>();
+    /** Bounded LRU so long sessions can't grow the cache without limit. */
+    private static final Map<String, Image> CACHE = java.util.Collections.synchronizedMap(
+            new LinkedHashMap<>(64, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, Image> e) {
+                    return size() > 128;
+                }
+            });
 
     private Icons() {}
 
@@ -224,11 +230,20 @@ public final class Icons {
         right.lineTo(cx, h * 0.96f);
         right.closePath();
 
-        g2.setColor(new Color(0x6faa3f));
+        // soft drop shadow
+        g2.setColor(Theme.withAlpha(new Color(0x000000), 50));
+        g2.fill(new java.awt.geom.Ellipse2D.Float(w * 0.14f, h * 0.78f, w * 0.72f, h * 0.24f));
+
+        g2.setColor(new Color(0x7cb342));
         g2.fill(top);
-        g2.setColor(new Color(0x71482b));
+        g2.setColor(new Color(0x7a5230));
         g2.fill(left);
-        g2.setColor(new Color(0x5a3a22));
+        g2.setColor(new Color(0x5d3f26));
+        g2.fill(right);
+        // facet shading for depth
+        g2.setColor(Theme.withAlpha(new Color(0xffffff), 26));
+        g2.fill(top);
+        g2.setColor(Theme.withAlpha(new Color(0x000000), 22));
         g2.fill(right);
 
         // pixel noise
@@ -257,10 +272,23 @@ public final class Icons {
             g2.fill(new java.awt.geom.Rectangle2D.Float(jx, jy, step, step));
         }
 
-        // grass overhang on side faces
-        g2.setColor(new Color(0x639937));
-        g2.fill(new java.awt.geom.Rectangle2D.Float(w * 0.06f, h * 0.30f, cx - w * 0.06f, step * 0.8f));
-        g2.fill(new java.awt.geom.Rectangle2D.Float(cx, h * 0.54f, w * 0.44f, step * 0.8f));
+        // grass overhang strips hugging the top edges of the side faces
+        g2.setColor(new Color(0x68a13a));
+        float oh = Math.max(2f, step * 0.8f);
+        Path2D ohL = new Path2D.Float();
+        ohL.moveTo(w * 0.06f, h * 0.30f);
+        ohL.lineTo(cx, h * 0.54f);
+        ohL.lineTo(cx, h * 0.54f + oh);
+        ohL.lineTo(w * 0.06f, h * 0.30f + oh);
+        ohL.closePath();
+        g2.fill(ohL);
+        Path2D ohR = new Path2D.Float();
+        ohR.moveTo(cx, h * 0.54f);
+        ohR.lineTo(w * 0.94f, h * 0.30f);
+        ohR.lineTo(w * 0.94f, h * 0.30f + oh);
+        ohR.lineTo(cx, h * 0.54f + oh);
+        ohR.closePath();
+        g2.fill(ohR);
 
         // subtle outline
         g2.setStroke(new BasicStroke(Math.max(1f, size / 90f)));
@@ -268,6 +296,55 @@ public final class Icons {
         g2.draw(top);
         g2.draw(left);
         g2.draw(right);
+
+        g2.dispose();
+        CACHE.put(key, imgRef);
+        return imgRef;
+    }
+
+    /**
+     * The launcher's brand mark: the grass block on a rounded badge with a
+     * dark gradient, subtle rim light and a soft shadow. Used for the window
+     * icon, the nav rail, the title bar and every exported icon file.
+     */
+    public static Image brandBadge(int size) {
+        String key = "badge@" + size;
+        Image img = CACHE.get(key);
+        if (img != null) return img;
+
+        BufferedImage buf = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Image imgRef = buf;
+        Graphics2D g2 = buf.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+
+        float pad = size * 0.05f;
+        var badge = new java.awt.geom.RoundRectangle2D.Float(
+                pad, pad, size - pad * 2, size - pad * 2, size * 0.24f, size * 0.24f);
+
+        // vertical gradient face
+        var face = new java.awt.GradientPaint(0, pad, new Color(0x2e3540), 0, size - pad, new Color(0x151920));
+        g2.setPaint(face);
+        g2.fill(badge);
+
+        // green glow behind the block
+        g2.setColor(Theme.withAlpha(new Color(0x7cb342), 36));
+        g2.fill(new java.awt.geom.Ellipse2D.Float(size * 0.16f, size * 0.22f, size * 0.68f, size * 0.62f));
+
+        // the block, slightly inset
+        float block = size * 0.72f;
+        float off = (size - block) / 2f;
+        Image b = grassBlock(Math.max(24, Math.round(block)));
+        g2.drawImage(b, Math.round(off), Math.round(off), Math.round(block), Math.round(block), null);
+
+        // rim light + hairline border
+        g2.setStroke(new BasicStroke(Math.max(1f, size / 64f)));
+        g2.setColor(Theme.withAlpha(new Color(0xffffff), 36));
+        g2.draw(badge);
+        g2.setColor(Theme.withAlpha(new Color(0x000000), 70));
+        var inner = new java.awt.geom.RoundRectangle2D.Float(
+                pad + 1, pad + 1, size - pad * 2 - 2, size - pad * 2 - 2, size * 0.24f, size * 0.24f);
+        g2.draw(inner);
 
         g2.dispose();
         CACHE.put(key, imgRef);
