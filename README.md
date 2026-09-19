@@ -92,6 +92,13 @@ uninstalling never touches your accounts, settings or downloaded versions:
 
 Delete the data folder from the table above if you want everything gone.
 
+## Wiki
+
+Full release-by-release changelog and the complete commit history live in the
+repo wiki (mirrored in [`docs/wiki/`](docs/wiki) — `Home`, `Changelog`,
+`Commits`). Publish updates to the GitHub wiki with `./scripts/publish-wiki.sh`
+after creating the first wiki page once in the browser.
+
 ## Build & CI
 
 Requires **JDK 17+** (any vendor). No other tooling.
