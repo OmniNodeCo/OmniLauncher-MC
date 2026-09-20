@@ -88,13 +88,29 @@ public final class Theme {
     public static Font xbold(float size)     { return derive("xb", baseExtraBold, size, Font.BOLD); }
 
     private static Font derive(String key, Font base, float size, int style) {
+        Font b = base;
+        if (b == null) { // fonts not initialized yet (headless/tests) — load once
+            loadFonts();
+            b = baseFor(key);
+        }
+        if (b == null) b = new Font(Font.SANS_SERIF, Font.PLAIN, 13);
         String k = key + "@" + size;
         Font f = CACHE.get(k);
         if (f == null) {
-            f = base.deriveFont(style, size);
+            f = b.deriveFont(style, size);
             CACHE.put(k, f);
         }
         return f;
+    }
+
+    private static Font baseFor(String key) {
+        return switch (key) {
+            case "m" -> baseMedium;
+            case "sb" -> baseSemiBold;
+            case "b" -> baseBold;
+            case "xb" -> baseExtraBold;
+            default -> baseRegular;
+        };
     }
 
     public static Color lighten(Color c, float amount) {

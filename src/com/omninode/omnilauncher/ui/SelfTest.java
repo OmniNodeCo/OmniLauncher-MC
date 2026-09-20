@@ -13,6 +13,7 @@ import java.util.zip.ZipOutputStream;
 import com.omninode.omnilauncher.api.MicrosoftAuth;
 import com.omninode.omnilauncher.api.NewsService;
 import com.omninode.omnilauncher.api.VersionManifest;
+import com.omninode.omnilauncher.ui.components.VersionComboBox;
 import com.omninode.omnilauncher.core.RuntimeManager;
 import com.omninode.omnilauncher.core.Settings;
 import com.omninode.omnilauncher.core.VersionInstaller;
@@ -164,6 +165,7 @@ public final class SelfTest {
         rulesTests();
         versionJsonTests();
         manifestTests();
+        comboGuardTests();
         newsTests();
         authShapeTests();
         accountTests();
@@ -308,6 +310,31 @@ public final class SelfTest {
         eq(4, withOld.size(), "visible with historical");
         eq("1.21.9", VersionManifest.resolveSelected("").id(), "resolve default → latest release");
         eq("1.5.2", VersionManifest.resolveSelected("1.5.2").id(), "resolve by id");
+    }
+
+    private static void comboGuardTests() {
+        com.omninode.omnilauncher.ui.Theme.init();
+        // regression: opening the popup ran refresh() which re-selected the
+        // current entry and fired onSelect -> close/save/reopen storm that
+        // wedged the EDT on the second open
+        var box = new VersionComboBox();
+        var panel = box.new PopupPanel();
+        int[] fired = {0};
+        panel.onSelect = e -> { fired[0]++; box.setSelected(e, false); };
+        var vis = VersionManifest.visibleEntries(Settings.get().showSnapshots,
+                Settings.get().showHistorical);
+        eq(true, vis.size() >= 2, "combo: fixture has visible entries");
+        var a = vis.get(0);
+        var b = vis.get(1);
+        box.setSelected(a, false);
+        eq(false, box.isPopupVisible(), "combo: popup starts hidden");
+        panel.refresh();
+        eq(0, fired[0], "combo: refresh selection is guarded");
+        panel.list.setSelectedValue(b, false);
+        eq(1, fired[0], "combo: user selection fires once");
+        eq(b.id(), box.getSelected().id(), "combo: selection propagates");
+        panel.refresh();
+        eq(1, fired[0], "combo: second refresh still guarded");
     }
 
     private static void newsTests() {
@@ -948,7 +975,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.6", GameLauncher.LAUNCHER_VERSION, "version is 0.3.6");
+        eq("0.3.7", GameLauncher.LAUNCHER_VERSION, "version is 0.3.7");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");

@@ -42,8 +42,8 @@ public class VersionComboBox extends javax.swing.JComponent {
         popup.add(popupPanel);
         popup.setFocusable(true);
         addMouseListener(new MouseAdapter() {
-            @Override public void mouseReleased(MouseEvent e) {
-                if (contains(e.getPoint())) showPopup();
+            @Override public void mousePressed(MouseEvent e) {
+                if (contains(e.getPoint())) togglePopup();
             }
         });
         popupPanel.onSelect = entry -> {
@@ -62,12 +62,32 @@ public class VersionComboBox extends javax.swing.JComponent {
 
     public VersionManifest.Entry getSelected() { return selected; }
 
+    /** Open when closed, close when open (the press can arrive while the
+     *  popup's grab still considers it visible, in either order — both safe). */
+    private void togglePopup() {
+        if (popup.isVisible()) {
+            popup.setVisible(false);
+        } else {
+            showPopup();
+        }
+    }
+
     private void showPopup() {
+        // Re-showing an already-visible JPopupMenu from inside the mouse-grab
+        // dispatch wedges the EDT (the app freezes until killed). Guard + move
+        // the actual show off the input event.
+        if (popup.isVisible()) return;
         popupPanel.refresh();
         popup.setPopupSize(new Dimension(Math.max(380, getWidth()), 380));
-        popup.show(this, 0, getHeight() + 4);
-        popupPanel.focusSearch();
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            if (popup.isVisible()) return;
+            popup.show(VersionComboBox.this, 0, getHeight() + 4);
+            popupPanel.focusSearch();
+        });
     }
+
+    /** Test hook: whether the version popup is currently visible. */
+    public boolean isPopupVisible() { return popup.isVisible(); }
 
     @Override public Dimension getPreferredSize() { return new Dimension(360, 50); }
 
@@ -128,13 +148,15 @@ public class VersionComboBox extends javax.swing.JComponent {
         return p;
     }
 
-    class PopupPanel extends javax.swing.JPanel {
+    public class PopupPanel extends javax.swing.JPanel {
         final javax.swing.JTextField search = new RTextField("Search versions…");
         final DefaultListModel<VersionManifest.Entry> model = new DefaultListModel<>();
-        final JList<VersionManifest.Entry> list = new JList<>(model);
-        Consumer<VersionManifest.Entry> onSelect;
+        public final JList<VersionManifest.Entry> list = new JList<>(model);
+        public Consumer<VersionManifest.Entry> onSelect;
+        /** Guards refresh()-driven selection changes from re-firing onSelect. */
+        private boolean selecting;
 
-        PopupPanel() {
+        public PopupPanel() {
             setLayout(new BorderLayout());
             setBackground(Theme.PANEL);
             setPreferredSize(new Dimension(420, 380));
@@ -159,17 +181,16 @@ public class VersionComboBox extends javax.swing.JComponent {
                 }
             });
             list.addListSelectionListener(e -> {
-                if (!e.getValueIsAdjusting() && onSelect != null) {
-                    VersionManifest.Entry en = list.getSelectedValue();
-                    if (en != null) { onSelect.accept(en); }
-                }
+                if (selecting || e.getValueIsAdjusting() || onSelect == null) return;
+                VersionManifest.Entry en = list.getSelectedValue();
+                if (en != null) { onSelect.accept(en); }
             });
             add(Theme.scroll(list), BorderLayout.CENTER);
         }
 
-        void focusSearch() { search.requestFocusInWindow(); }
+        public void focusSearch() { search.requestFocusInWindow(); }
 
-        void refresh() {
+        public void refresh() {
             String q = search.getText() == null ? "" : search.getText().trim().toLowerCase();
             List<VersionManifest.Entry> all = VersionManifest.visibleEntries(
                     com.omninode.omnilauncher.core.Settings.get().showSnapshots,
@@ -180,7 +201,11 @@ public class VersionComboBox extends javax.swing.JComponent {
             }
             model.clear();
             for (VersionManifest.Entry e : out) model.addElement(e);
-            if (selected != null) list.setSelectedValue(selected, false);
+            if (selected != null) {
+                selecting = true;
+                try { list.setSelectedValue(selected, false); }
+                finally { selecting = false; }
+            }
         }
     }
 
