@@ -83,6 +83,26 @@ Reader declutter + readable/copyable text.
 
 **Commits (1):** [`4fa584d`](https://github.com/OmniNodeCo/OmniLauncher-MC/commit/4fa584d)
 
+## v0.3.6 — 2026-09-19
+
+Publish-wiki automation, crash hardening, performance, and a redesigned logo.
+
+- **CI: `publish-wiki.yml`** syncs `docs/wiki/` to the GitHub wiki on every change (needs `contents: write` — fixed after the first run 403'd)
+- **Crash fixes:** uncaught exceptions write timestamped `crash-*.log` reports (last 10 kept); settings/accounts save atomically (temp file + move) so a crash can't truncate config
+- **Performance:** `Icons` cache is a bounded LRU (128) instead of an unbounded map; system AA text flags baked into packaged launches
+- **New logo:** grass block on a rounded gradient badge with green glow and rim light (window icon, nav rail, title bar, play page, settings, all exported icons); `--export-icon` now also emits a resolution-independent **`OmniLauncher.svg`** mirroring the badge
+- Selftest 181 → 183. Version 0.3.6
+
+## v0.3.7 — 2026-09-20
+
+Fix: the version dropdown froze the whole app.
+
+- **Fix: dropdown freeze** — clicking the version picker while its popup was open called `JPopupMenu.show()` on an already-visible popup from inside the mouse-grab dispatch, wedging the EDT ("not responding"). The picker now toggles (click to open, click again to close), never re-shows a visible popup, and the actual show runs off the input event
+- `refresh()` no longer re-fires the select callback for the programmatic re-selection of the current entry (this caused a close/select/save churn on every open once a version was picked)
+- Crash hardening: `Theme.derive` lazily initializes fonts and falls back to a logical font instead of NPE-ing when UI components are created before `Theme.init()`
+- Selftest 183 → 189 (dropdown selection-guard regression tests)
+- Version 0.3.7
+
 ## v0.3.5 — 2026-09-19
 
 Java runtime detection overhaul.

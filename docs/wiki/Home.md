@@ -11,14 +11,14 @@ installers for Windows (custom Inno Setup EXE), macOS (dmg) and Linux (deb/rpm).
 - **[Changelog](Changelog)** — every release and what changed, with commit links
 - **[Commits](Commits)** — the complete commit history
 
-## Latest release: v0.3.6
+## Latest release: v0.3.7
 
 | Platform | Download | Size |
 |---|---|---|
-| Windows (custom installer) | [OmniLauncher-0.3.5.exe](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/OmniLauncher-0.3.5.exe) | 31.9 MB |
-| macOS | [OmniLauncher-0.3.5.dmg](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/OmniLauncher-0.3.5.dmg) | 52.2 MB |
-| Linux (Debian/Ubuntu) | [omnilauncher_0.3.5-1_amd64.deb](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/omnilauncher_0.3.5-1_amd64.deb) | ~35.8 MB |
-| Linux (Fedora/RHEL) | [omnilauncher-0.3.5-1.x86_64.rpm](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/omnilauncher-0.3.5-1.x86_64.rpm) | ~50.5 MB |
+| Windows (custom installer) | [OmniLauncher-0.3.7.exe](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/OmniLauncher-0.3.7.exe) | 31.9 MB |
+| macOS | [OmniLauncher-0.3.7.dmg](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/OmniLauncher-0.3.7.dmg) | 52.2 MB |
+| Linux (Debian/Ubuntu) | [omnilauncher_0.3.7-1_amd64.deb](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/omnilauncher_0.3.7-1_amd64.deb) | ~35.8 MB |
+| Linux (Fedora/RHEL) | [omnilauncher-0.3.7-1.x86_64.rpm](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.6/omnilauncher-0.3.7-1.x86_64.rpm) | ~50.5 MB |
 
 Installers **upgrade in place**: running a new installer removes the previous
 OmniLauncher and reinstalls into the same folder; user data always lives outside
