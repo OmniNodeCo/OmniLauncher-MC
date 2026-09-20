@@ -21,9 +21,9 @@ installers for Windows (custom Inno Setup EXE), macOS (dmg) and Linux (deb/rpm).
 | Linux (Fedora/RHEL) | [omnilauncher-0.3.8-1.x86_64.rpm](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.8/omnilauncher-0.3.8-1.x86_64.rpm) | ~50.5 MB |
 
 Installers **upgrade in place**: running a new installer removes the previous
-OmniLauncher and reinstalls into the same folder; user data always lives outside
-the app (`%APPDATA%\OmniLauncher` / `~/Library/Application Support/OmniLauncher`
-/ `~/.config/omnilauncher`) and is never removed.
+OmniLauncher and reinstalls into the same folder. All user data lives outside
+the app in `~/.omnilauncher` (instances, settings, accounts, logs, caches) and
+is never removed; folders from older versions are migrated automatically.
 
 ## Highlights
 
@@ -33,7 +33,7 @@ the app (`%APPDATA%\OmniLauncher` / `~/Library/Application Support/OmniLauncher`
 - Official Minecraft news feed with card/banner images, full blog-style article reader and Copy-text
 - **Instances** — separate game folders per version, stored under `~/.omnilauncher` (migrated automatically from older layouts)
 - Automatic Java detection: PATH, JAVA_HOME, vendor directories and the bundled runtime — best major wins
-- 183-test built-in selftest suite; CI (GitHub Actions) gates every push with lint + build + selftests and ships installers on version tags
+- 210-test built-in selftest suite; CI (GitHub Actions) gates every push with lint + build + selftests and ships installers on version tags
 
 ## Building
 
