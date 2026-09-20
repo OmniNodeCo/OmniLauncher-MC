@@ -22,7 +22,7 @@ public class NavRail extends JComponent {
 
     public static final int WIDTH = 76;
 
-    public enum Page { PLAY, NEWS, SETTINGS }
+    public enum Page { PLAY, INSTANCES, NEWS, SETTINGS }
 
     private Page selected = Page.PLAY;
     private Consumer<Page> onNavigate;
@@ -36,12 +36,13 @@ public class NavRail extends JComponent {
             @Override public void mouseReleased(MouseEvent e) {
                 int i = zoneAt(e.getX(), e.getY());
                 if (i == 0 && onNavigate != null) onNavigate.accept(Page.PLAY);
-                if (i == 1 && onNavigate != null) onNavigate.accept(Page.NEWS);
-                if (i == 2 && onNavigate != null) onNavigate.accept(Page.SETTINGS);
-                if (i == 3 && onAccounts != null) onAccounts.run();
+                if (i == 1 && onNavigate != null) onNavigate.accept(Page.INSTANCES);
+                if (i == 2 && onNavigate != null) onNavigate.accept(Page.NEWS);
+                if (i == 3 && onNavigate != null) onNavigate.accept(Page.SETTINGS);
+                if (i == 4 && onAccounts != null) onAccounts.run();
             }
             @Override public void mouseMoved(MouseEvent e) {
-                avatarHover = zoneAt(e.getX(), e.getY()) == 3;
+                avatarHover = zoneAt(e.getX(), e.getY()) == 4;
                 setCursor(avatarHover || zoneAt(e.getX(), e.getY()) >= 0
                         ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
                 repaint();
@@ -55,13 +56,14 @@ public class NavRail extends JComponent {
     public void setOnAccounts(Runnable r) { onAccounts = r; }
     public void setSelected(Page p) { selected = p; repaint(); }
 
-    /** 0..2 nav items, 3 = avatar zone, -1 elsewhere. */
+    /** 0..3 nav items, 4 = avatar zone, -1 elsewhere. */
     private int zoneAt(int x, int y) {
         if (x < 8 || x > WIDTH - 8) return -1;
         if (y >= 52 && y <= 100) return 0;
         if (y >= 112 && y <= 160) return 1;
         if (y >= 172 && y <= 220) return 2;
-        if (y >= getHeight() - 56 && y <= getHeight() - 12) return 3;
+        if (y >= 232 && y <= 280) return 3;
+        if (y >= getHeight() - 56 && y <= getHeight() - 12) return 4;
         return -1;
     }
 
@@ -78,11 +80,12 @@ public class NavRail extends JComponent {
 
         Image[] glyphs = {
                 Icons.glyph(Glyph.PLAY, 20, iconColor(0)),
-                Icons.glyph(Glyph.NEWS, 20, iconColor(1)),
-                Icons.glyph(Glyph.GEAR, 20, iconColor(2)),
+                Icons.glyph(Glyph.FOLDER, 20, iconColor(1)),
+                Icons.glyph(Glyph.NEWS, 20, iconColor(2)),
+                Icons.glyph(Glyph.GEAR, 20, iconColor(3)),
         };
-        int[] y0 = {56, 116, 176};
-        for (int i = 0; i < 3; i++) {
+        int[] y0 = {56, 116, 176, 236};
+        for (int i = 0; i < 4; i++) {
             boolean sel = pageOf(i) == selected;
             if (sel) {
                 g.setColor(new Color(0x22242a));
@@ -125,6 +128,11 @@ public class NavRail extends JComponent {
     }
 
     private Page pageOf(int i) {
-        return i == 0 ? Page.PLAY : i == 1 ? Page.NEWS : Page.SETTINGS;
+        return switch (i) {
+            case 0 -> Page.PLAY;
+            case 1 -> Page.INSTANCES;
+            case 2 -> Page.NEWS;
+            default -> Page.SETTINGS;
+        };
     }
 }

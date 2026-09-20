@@ -65,6 +65,14 @@ public final class Preview {
                 AppState.get().set(AppState.Phase.ERROR,
                         "Minecraft 1.21.9 requires Java 21 — set it in Settings → Java");
             }
+            case "instances" -> {
+                shell.navigate(NavRail.Page.INSTANCES);
+                com.omninode.omnilauncher.core.InstanceStore.reload();
+                var a = com.omninode.omnilauncher.core.InstanceStore.create("Survival 1.21", "1.21.9");
+                if (a != null) a.lastPlayed = System.currentTimeMillis() - 3_600_000;
+                com.omninode.omnilauncher.core.InstanceStore.create("Snapshot testing", "25w45a");
+                shell.instances.refresh();
+            }
             case "news" -> shell.navigate(NavRail.Page.NEWS);
             case "detail" -> {
                 shell.navigate(NavRail.Page.NEWS);

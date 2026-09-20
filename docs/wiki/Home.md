@@ -11,14 +11,14 @@ installers for Windows (custom Inno Setup EXE), macOS (dmg) and Linux (deb/rpm).
 - **[Changelog](Changelog)** — every release and what changed, with commit links
 - **[Commits](Commits)** — the complete commit history
 
-## Latest release: v0.3.7
+## Latest release: v0.3.8
 
 | Platform | Download | Size |
 |---|---|---|
-| Windows (custom installer) | [OmniLauncher-0.3.7.exe](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.7/OmniLauncher-0.3.7.exe) | 31.9 MB |
-| macOS | [OmniLauncher-0.3.7.dmg](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.7/OmniLauncher-0.3.7.dmg) | 52.2 MB |
-| Linux (Debian/Ubuntu) | [omnilauncher_0.3.7-1_amd64.deb](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.7/omnilauncher_0.3.7-1_amd64.deb) | ~35.8 MB |
-| Linux (Fedora/RHEL) | [omnilauncher-0.3.7-1.x86_64.rpm](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.7/omnilauncher-0.3.7-1.x86_64.rpm) | ~50.5 MB |
+| Windows (custom installer) | [OmniLauncher-0.3.8.exe](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.8/OmniLauncher-0.3.8.exe) | 31.9 MB |
+| macOS | [OmniLauncher-0.3.8.dmg](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.8/OmniLauncher-0.3.8.dmg) | 52.2 MB |
+| Linux (Debian/Ubuntu) | [omnilauncher_0.3.8-1_amd64.deb](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.8/omnilauncher_0.3.8-1_amd64.deb) | ~35.8 MB |
+| Linux (Fedora/RHEL) | [omnilauncher-0.3.8-1.x86_64.rpm](https://github.com/OmniNodeCo/OmniLauncher-MC/releases/download/v0.3.8/omnilauncher-0.3.8-1.x86_64.rpm) | ~50.5 MB |
 
 Installers **upgrade in place**: running a new installer removes the previous
 OmniLauncher and reinstalls into the same folder; user data always lives outside
@@ -31,6 +31,7 @@ the app (`%APPDATA%\OmniLauncher` / `~/Library/Application Support/OmniLauncher`
 - Full Mojang integration: version manifest, version JSON, assets & libraries with SHA-1 verification, bundled Java runtimes (auto-download)
 - Microsoft sign-in (device code flow), offline accounts
 - Official Minecraft news feed with card/banner images, full blog-style article reader and Copy-text
+- **Instances** — separate game folders per version, stored under `~/.omnilauncher` (migrated automatically from older layouts)
 - Automatic Java detection: PATH, JAVA_HOME, vendor directories and the bundled runtime — best major wins
 - 183-test built-in selftest suite; CI (GitHub Actions) gates every push with lint + build + selftests and ships installers on version tags
 

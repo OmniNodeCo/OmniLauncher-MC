@@ -19,7 +19,7 @@ import com.omninode.omnilauncher.util.Os;
 public class GameLauncher {
 
     public static final String LAUNCHER_NAME = "OmniLauncher";
-    public static final String LAUNCHER_VERSION = "0.3.7";
+    public static final String LAUNCHER_VERSION = "0.3.8";
 
     public record JavaRuntime(Path javaExe, int major) {}
 
@@ -40,6 +40,13 @@ public class GameLauncher {
      */
     public static List<String> buildCommand(VersionInstaller.InstalledVersion v,
                                             Account account, JavaRuntime rt) {
+        return buildCommand(v, account, rt, Settings.get().resolveGameDir());
+    }
+
+    /** As above, but with an explicit game directory (used by instances). */
+    public static List<String> buildCommand(VersionInstaller.InstalledVersion v,
+                                            Account account, JavaRuntime rt,
+                                            java.nio.file.Path gameDir) {
         Settings s = Settings.get();
         Os os = Os.get();
 
@@ -55,7 +62,7 @@ public class GameLauncher {
         Map<String, String> gameVars = new LinkedHashMap<>(vars);
         gameVars.put("auth_player_name", account.getName());
         gameVars.put("version_name", v.json().id);
-        gameVars.put("game_directory", s.resolveGameDir().toString());
+        gameVars.put("game_directory", gameDir.toAbsolutePath().toString());
         gameVars.put("assets_root", Os.assetsDir().toString());
         gameVars.put("assets_index_name",
                 v.json().assetIndex != null ? v.json().assetIndex.id() : "legacy");
@@ -169,6 +176,13 @@ public class GameLauncher {
 
     public static Process launch(VersionInstaller.InstalledVersion v, Account account,
                                  JavaRuntime rt, RunListener listener) throws IOException {
+        return launch(v, account, rt, Settings.get().resolveGameDir(), listener);
+    }
+
+    /** As above, but with an explicit game directory (used by instances). */
+    public static Process launch(VersionInstaller.InstalledVersion v, Account account,
+                                 JavaRuntime rt, java.nio.file.Path gameDir,
+                                 RunListener listener) throws IOException {
         if (rt == null) {
             listener.failed("No Java runtime available.");
             return null;
@@ -179,8 +193,7 @@ public class GameLauncher {
                     + " but the selected runtime is Java " + rt.major() + ".");
             return null;
         }
-        List<String> cmd = buildCommand(v, account, rt);
-        Path gameDir = Settings.get().resolveGameDir();
+        List<String> cmd = buildCommand(v, account, rt, gameDir);
         Files.createDirectories(gameDir);
 
         Log.info("Launching Minecraft " + v.json().id + " with " + rt.javaExe());
@@ -246,9 +259,12 @@ public class GameLauncher {
 
     private static volatile JavaRuntime cached;
 
+    private static volatile long scanMissUntil;
+
     public static JavaRuntime findJava() {
         JavaRuntime c = cached;
         if (c != null) return c;
+        if (System.currentTimeMillis() < scanMissUntil) return null; // recently scanned, nothing found
         Settings s = Settings.get();
         List<Path> candidates = javaCandidates(
                 s.javaPath == null || s.javaPath.isBlank() ? null : s.javaPath,
@@ -261,7 +277,12 @@ public class GameLauncher {
             if (major >= 8) probed.add(new JavaRuntime(p.toAbsolutePath(), major));
         }
         JavaRuntime best = pickBest(probed);
-        if (best != null) cached = best;
+        if (best != null) {
+            cached = best;
+        } else {
+            // each probe spawns a process; don't rescan more than once / 30 s
+            scanMissUntil = System.currentTimeMillis() + 30_000;
+        }
         return best;
     }
 

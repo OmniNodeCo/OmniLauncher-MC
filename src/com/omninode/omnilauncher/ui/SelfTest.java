@@ -19,6 +19,8 @@ import com.omninode.omnilauncher.core.Settings;
 import com.omninode.omnilauncher.core.VersionInstaller;
 import com.omninode.omnilauncher.core.VersionJson;
 import com.omninode.omnilauncher.core.GameLauncher;
+import com.omninode.omnilauncher.core.Instance;
+import com.omninode.omnilauncher.core.InstanceStore;
 import com.omninode.omnilauncher.util.Http;
 import com.omninode.omnilauncher.model.Account;
 import com.omninode.omnilauncher.util.Json;
@@ -166,6 +168,7 @@ public final class SelfTest {
         versionJsonTests();
         manifestTests();
         comboGuardTests();
+        instanceTests();
         newsTests();
         authShapeTests();
         accountTests();
@@ -341,6 +344,58 @@ public final class SelfTest {
         eq(false, box.shouldOpen(now), "combo: click right after close is swallowed");
         box.noteHiddenForTest(now - 1000);
         eq(true, box.shouldOpen(now), "combo: later click reopens");
+    }
+
+    private static void instanceTests() {
+        Path sandbox = Path.of(System.getProperty("java.io.tmpdir"),
+                "omni-it-instances-" + System.nanoTime());
+        Os.setDataDirForTests(sandbox);
+        try {
+            InstanceStore.reload();
+            eq(0, InstanceStore.all().size(), "instances: start empty");
+            Instance a = InstanceStore.create("Survival 1.21", "1.21.9");
+            eq(true, a != null, "instances: create");
+            eq(null, InstanceStore.create("survival 1.21", "1.21.9"), "instances: duplicate rejected");
+            eq(null, InstanceStore.create("  ", "1.21.9"), "instances: blank rejected");
+            Instance b = InstanceStore.create("Snapshots", "25w45a");
+            eq(2, InstanceStore.all().size(), "instances: two stored");
+            eq("survival-1-21", InstanceStore.slug("Survival 1.21"), "instances: slug");
+            // persistence round-trip
+            InstanceStore.reload();
+            eq(2, InstanceStore.all().size(), "instances: persisted");
+            eq("1.21.9", InstanceStore.get(a.id).versionId, "instances: version persisted");
+            // folder layout <data>/instances/<id>/game
+            eq(sandbox.resolve("instances").resolve(a.id).resolve("game").toString(),
+                    a.gameDir().toString(), "instances: game dir layout");
+            InstanceStore.touch(a.id);
+            InstanceStore.reload();
+            eq(true, InstanceStore.get(a.id).lastPlayed > 0, "instances: lastPlayed persisted");
+            // removal keeps files
+            eq(true, InstanceStore.remove(b.id), "instances: remove");
+            eq(null, InstanceStore.get(b.id), "instances: removed gone");
+            eq(false, InstanceStore.remove("nope"), "instances: remove unknown");
+            InstanceStore.reload();
+            eq(1, InstanceStore.all().size(), "instances: removal persisted");
+
+            // data-dir migration: moves legacy folder, refuses to clobber
+            Path legacy = sandbox.resolve("legacy");
+            java.nio.file.Files.createDirectories(legacy.resolve("versions"));
+            java.nio.file.Files.writeString(legacy.resolve("settings.json"), "{}");
+            Path target = sandbox.resolve("target");
+            eq("moved", Os.migrateDataDir(legacy, target), "migration: moves legacy");
+            eq(true, java.nio.file.Files.exists(target.resolve("settings.json")), "migration: contents moved");
+            eq(false, java.nio.file.Files.exists(legacy), "migration: legacy gone");
+            java.nio.file.Files.createDirectories(legacy);
+            eq("exists", Os.migrateDataDir(legacy, target), "migration: target protected");
+            eq("absent", Os.migrateDataDir(sandbox.resolve("nope"), sandbox.resolve("t2")),
+                    "migration: absent reported");
+        } catch (Exception e) {
+            fail("instances: " + e);
+        } finally {
+            Os.setDataDirForTests(null);
+            InstanceStore.reload();
+            rmrf(sandbox);
+        }
     }
 
     private static void newsTests() {
@@ -981,7 +1036,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.7", GameLauncher.LAUNCHER_VERSION, "version is 0.3.7");
+        eq("0.3.8", GameLauncher.LAUNCHER_VERSION, "version is 0.3.8");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");
@@ -1025,5 +1080,17 @@ public final class SelfTest {
     private static void fail(String name) {
         failed++;
         System.out.println("FAIL  " + name);
+    }
+
+    /** Recursive delete for test sandboxes. */
+    private static void rmrf(Path p) {
+        if (p == null || !java.nio.file.Files.exists(p)) return;
+        try (var walk = java.nio.file.Files.walk(p)) {
+            walk.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(x -> {
+                        try { java.nio.file.Files.deleteIfExists(x); }
+                        catch (Exception ignored) {}
+                    });
+        } catch (Exception ignored) {}
     }
 }

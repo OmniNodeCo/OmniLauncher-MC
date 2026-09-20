@@ -18,6 +18,7 @@ public class LauncherShell extends JPanel {
     private final CardLayout cards = new CardLayout();
     private final JPanel pages = new JPanel(cards);
     public final PlayPanel play;
+    public final InstancesPanel instances;
     public final NewsPanel news;
     public final SettingsPanel settings;
 
@@ -37,11 +38,13 @@ public class LauncherShell extends JPanel {
             }
             @Override public void showNewsPage() { navigate(NavRail.Page.NEWS); }
         });
+        instances = new InstancesPanel();
         news = new NewsPanel();
         settings = new SettingsPanel(this::openAccounts);
 
         pages.setOpaque(false);
         pages.add(play, NavRail.Page.PLAY.name());
+        pages.add(instances, NavRail.Page.INSTANCES.name());
         pages.add(news, NavRail.Page.NEWS.name());
         pages.add(settings, NavRail.Page.SETTINGS.name());
         add(pages, BorderLayout.CENTER);
@@ -60,7 +63,11 @@ public class LauncherShell extends JPanel {
     public void navigate(NavRail.Page page) {
         cards.show(pages, page.name());
         navRail.setSelected(page);
-        play.onShown();
+        switch (page) {
+            case PLAY -> play.onShown();
+            case INSTANCES -> instances.onShown();
+            default -> { }
+        }
     }
 
     public void openAccounts() {

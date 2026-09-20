@@ -93,6 +93,16 @@ Publish-wiki automation, crash hardening, performance, and a redesigned logo.
 - **New logo:** grass block on a rounded gradient badge with green glow and rim light (window icon, nav rail, title bar, play page, settings, all exported icons); `--export-icon` now also emits a resolution-independent **`OmniLauncher.svg`** mirroring the badge
 - Selftest 181 → 183. Version 0.3.6
 
+## v0.3.8 — 2026-09-20
+
+`~/.omnilauncher`, instances, and full diagnostics.
+
+- **`.omnilauncher` data folder** — one folder on every OS (like `.minecraft`); existing per-OS data folders (`%APPDATA%\OmniLauncher`, `~/Library/Application Support/OmniLauncher`, `~/.config/omnilauncher`) are **migrated automatically** on first start (never clobbers an existing target)
+- **Instances** — named installations pinned to one Minecraft version each, like MultiMC/Prism: new **Instances page** in the nav rail with create/play/remove, isolated game folders (`~/.omnilauncher/instances/<id>/game` — separate saves, configs, screenshots) while jar/libraries/assets stay shared to save disk; stored atomically in `instances.json`; Play pins the version and uses the instance folder, never touching your default `.minecraft`
+- **Crash & diagnostic logging** — session-start header (version, OS/arch, Java vendor+version, data dir, args) plus the existing per-launch command logging and crash-*.log reports; new **Settings → Diagnostics** with "Open logs folder" / "Open data folder"
+- **Optimizations** — Java-runtime scans after a failed lookup are debounced to once per 30 s instead of re-probing every candidate each launch attempt; instance/atomically-written stores cache in memory
+- Selftest 191 → 210 (instance store lifecycle/persistence/layout, migration semantics). Version 0.3.8
+
 ## v0.3.7 — 2026-09-20
 
 Fix: the version dropdown froze the whole app.

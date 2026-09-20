@@ -19,6 +19,37 @@ import com.omninode.omnilauncher.util.Os;
 /** Entry point: GUI by default, plus headless CLI modes. */
 public class Main {
 
+    /** Logs the session header and migrates legacy data folders (once). */
+    private static void startupDiagnostics(String[] args) {
+        Log.info("OmniLauncher " + GameLauncher.LAUNCHER_VERSION + " starting"
+                + " — os=" + Os.get().family + "/" + Os.get().arch
+                + " java=" + System.getProperty("java.version")
+                + " (" + System.getProperty("java.vendor", "") + ")"
+                + " dataDir=" + Os.dataDir()
+                + " args=" + String.join(" ", args));
+        migrateLegacyData();
+    }
+
+    private static void migrateLegacyData() {
+        try {
+            Path data = Os.dataDir();
+            if (System.getProperty("omnilauncher.data") != null) return; // test/override
+            if (Files.exists(data)) return; // already on the new layout
+            for (Path legacy : Os.legacyDataDirs()) {
+                String result = Os.migrateDataDir(legacy, data);
+                if ("moved".equals(result)) {
+                    Log.info("Migrated data folder " + legacy + " -> " + data);
+                    return;
+                }
+                if ("failed".equals(result)) {
+                    Log.warn("Could not migrate legacy data folder " + legacy);
+                }
+            }
+        } catch (Throwable t) {
+            Log.warn("Data migration check failed: " + t);
+        }
+    }
+
     public static void main(String[] args) {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             Log.error("Uncaught on " + t.getName(), e);
@@ -50,6 +81,8 @@ public class Main {
                 // never let crash reporting itself break the app
             }
         });
+
+        startupDiagnostics(args);
 
         if (args.length > 0) {
             switch (args[0]) {

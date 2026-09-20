@@ -22,6 +22,7 @@ import com.omninode.omnilauncher.core.GameLauncher;
 import com.omninode.omnilauncher.core.Settings;
 import com.omninode.omnilauncher.ui.components.HoverCard;
 import com.omninode.omnilauncher.ui.components.RButton;
+import com.omninode.omnilauncher.util.Os;
 import com.omninode.omnilauncher.ui.components.RSlider;
 import com.omninode.omnilauncher.ui.components.RTextField;
 import com.omninode.omnilauncher.ui.components.Toggle;
@@ -175,8 +176,43 @@ public class SettingsPanel extends JPanel {
         aboutText.setForeground(Theme.DIM);
         place(about, aboutText, 1);
 
+        // diagnostics: logs + crash reports live in the data folder
+        HoverCard diag = section();
+        column.add(Box.createVerticalStrut(14));
+        column.add(diag);
+        JLabel diagTitle = new JLabel("Diagnostics");
+        diagTitle.setFont(Theme.semi(13f));
+        diagTitle.setForeground(Theme.TEXT);
+        place(diag, diagTitle, 0);
+        JLabel diagText = new JLabel("<html><div style='width:560px;color:#9aa1ad'>"
+                + "Logs: " + Os.logsDir() + "<br>Crash reports (crash-*.log) land in the same folder."
+                + "</div></html>");
+        diagText.setFont(Theme.regular(11.5f));
+        diagText.setForeground(Theme.DIM);
+        place(diag, diagText, 1);
+        addButtons(diag, 2,
+                new String[]{"Open logs folder", "Open data folder"},
+                new Runnable[]{
+                        () -> openFolder(Os.logsDir()),
+                        () -> openFolder(Os.dataDir()),
+                });
+
         JScrollPane scroll = Theme.scroll(column);
         add(scroll, BorderLayout.CENTER);
+    }
+
+    private void openFolder(java.nio.file.Path dir) {
+        try {
+            java.nio.file.Files.createDirectories(dir);
+            if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop()
+                    .isSupported(java.awt.Desktop.Action.OPEN)) {
+                java.awt.Desktop.getDesktop().open(dir.toFile());
+            } else {
+                com.omninode.omnilauncher.util.Log.info("Folder: " + dir);
+            }
+        } catch (Exception e) {
+            com.omninode.omnilauncher.util.Log.warn("Could not open folder: " + e.getMessage());
+        }
     }
 
     private void touch() { saveDebounce.restart(); }

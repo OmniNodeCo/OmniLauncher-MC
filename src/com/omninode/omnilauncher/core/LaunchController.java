@@ -26,6 +26,11 @@ public class LaunchController {
     public Consumer<String> onNeedAccount;
 
     public void play(VersionManifest.Entry entry) {
+        play(entry, null);
+    }
+
+    /** Plays a launcher instance (pinned version + isolated game folder). */
+    public void play(VersionManifest.Entry entry, Instance instance) {
         AppState st = AppState.get();
         if (st.busy()) return;
 
@@ -38,7 +43,10 @@ public class LaunchController {
 
         cancelToken = Http.newCancelToken();
         Http.CancelToken token = cancelToken;
-        st.set(AppState.Phase.PREPARING, "Preparing to play " + entry.id() + "…");
+        st.set(AppState.Phase.PREPARING, "Preparing "
+                + (instance != null ? instance.name : "to play " + entry.id()) + "…");
+        if (instance != null) Log.info("Launching instance " + instance.name
+                + " [" + instance.id + "] on " + entry.id());
 
         final Account[] holder = {initialAccount};
         Async.io(() -> {
@@ -81,10 +89,14 @@ public class LaunchController {
                 // launch
                 st.set(AppState.Phase.LAUNCHING, "Launching Minecraft " + entry.id() + "…");
                 Account acc = account;
-                GameLauncher.launch(installed, acc, rt, new GameLauncher.RunListener() {
+                java.nio.file.Path gameDir = instance != null ? instance.gameDir() : null;
+                GameLauncher.launch(installed, acc, rt, gameDir, new GameLauncher.RunListener() {
                     @Override public void started(Process p) {
                         st.setGameProcess(p, entry.id());
-                        st.set(AppState.Phase.RUNNING, "Minecraft " + entry.id() + " is running");
+                        st.set(AppState.Phase.RUNNING,
+                                (instance != null ? instance.name + " — Minecraft " : "Minecraft ")
+                                        + entry.id() + " is running");
+                        if (instance != null) InstanceStore.touch(instance.id);
                         if (!Settings.get().keepLauncherOpen && p != null) Async.ui(() -> {
                             // window will be minimized by the UI layer listening to phase
                         });

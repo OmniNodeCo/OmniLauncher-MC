@@ -88,17 +88,45 @@ public final class Os {
         String override = System.getProperty("omnilauncher.data");
         if (override != null && !override.isBlank()) {
             d = Paths.get(override);
-        } else if (get().family == Family.WINDOWS) {
-            String appData = System.getenv("APPDATA");
-            d = Paths.get(appData != null ? appData : System.getProperty("user.home"), "OmniLauncher");
-        } else if (get().family == Family.MACOS) {
-            d = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "OmniLauncher");
         } else {
-            String xdg = System.getenv("XDG_CONFIG_HOME");
-            d = Paths.get(xdg != null && !xdg.isBlank() ? xdg : Paths.get(System.getProperty("user.home"), ".config").toString(), "omnilauncher");
+            // one folder on every OS, like the game's own .minecraft
+            d = Paths.get(System.getProperty("user.home"), ".omnilauncher");
         }
         dataDir = d;
         return d;
+    }
+
+    /** Data folders used by previous OmniLauncher versions (per-OS layouts). */
+    public static java.util.List<Path> legacyDataDirs() {
+        java.util.List<Path> out = new java.util.ArrayList<>();
+        String home = System.getProperty("user.home");
+        String appData = System.getenv("APPDATA");
+        if (appData != null && !appData.isBlank()) out.add(Paths.get(appData, "OmniLauncher"));
+        out.add(Paths.get(home, "Library", "Application Support", "OmniLauncher"));
+        String xdg = System.getenv("XDG_CONFIG_HOME");
+        out.add(Paths.get(xdg != null && !xdg.isBlank() ? xdg : Paths.get(home, ".config").toString(), "omnilauncher"));
+        return out;
+    }
+
+    /**
+     * Moves a legacy data folder's contents into {@code target}. Returns
+     * "moved", "absent", "exists" (target already present) or "failed".
+     */
+    public static String migrateDataDir(Path legacy, Path target) {
+        if (legacy == null || target == null || legacy.equals(target)) return "exists";
+        if (!Files.exists(legacy)) return "absent";
+        if (Files.exists(target)) return "exists";
+        try {
+            Files.createDirectories(target.getParent());
+            try {
+                Files.move(legacy, target);
+            } catch (java.nio.file.AtomicMoveNotSupportedException amnse) {
+                Files.move(legacy, target);
+            }
+            return "moved";
+        } catch (Exception e) {
+            return "failed";
+        }
     }
 
     /** Only used by the headless preview/self-test modes to sandbox data. */
@@ -108,6 +136,7 @@ public final class Os {
     public static Path assetsDir() { return dir(dataDir(), "assets"); }
     public static Path librariesDir() { return dir(dataDir(), "libraries"); }
     public static Path cacheDir() { return dir(dataDir(), "cache"); }
+    public static Path instancesDir() { return dir(dataDir(), "instances"); }
     public static Path logsDir() { return dir(dataDir(), "logs"); }
     public static Path accountsFile() { return dataDir().resolve("accounts.json"); }
     public static Path settingsFile() { return dataDir().resolve("settings.json"); }
