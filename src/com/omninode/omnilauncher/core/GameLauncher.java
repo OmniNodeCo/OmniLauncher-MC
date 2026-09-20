@@ -19,7 +19,7 @@ import com.omninode.omnilauncher.util.Os;
 public class GameLauncher {
 
     public static final String LAUNCHER_NAME = "OmniLauncher";
-    public static final String LAUNCHER_VERSION = "0.3.8";
+    public static final String LAUNCHER_VERSION = "0.3.9";
 
     public record JavaRuntime(Path javaExe, int major) {}
 
@@ -390,10 +390,17 @@ public class GameLauncher {
         return out;
     }
 
-    /** Runs `java -version` and parses the major version from stderr/stdout. */
+    /**
+     * Runs {@code java -version} and parses the major version.
+     * The output is merged: {@code java -version} prints to STDERR, so
+     * without redirectErrorStream the probe read an empty stream and every
+     * installed Java looked broken ("no Java runtime found").
+     */
     public static int probeJavaMajor(Path javaExe) {
         try {
-            Process p = new ProcessBuilder(javaExe.toString(), "-version").start();
+            ProcessBuilder pb = new ProcessBuilder(javaExe.toString(), "-version");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             String out;
             try (var in = p.getInputStream()) {
                 out = new String(in.readAllBytes());

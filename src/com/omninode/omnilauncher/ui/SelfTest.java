@@ -169,6 +169,7 @@ public final class SelfTest {
         manifestTests();
         comboGuardTests();
         instanceTests();
+        javaProbeTests();
         newsTests();
         authShapeTests();
         accountTests();
@@ -396,6 +397,21 @@ public final class SelfTest {
             InstanceStore.reload();
             rmrf(sandbox);
         }
+    }
+
+    private static void javaProbeTests() {
+        // regression: java -version prints to STDERR; the probe read only
+        // stdout, so every installed Java looked broken
+        Path javaExe = Path.of(System.getProperty("java.home"), "bin",
+                Os.get().isWindows() ? "java.exe" : "java");
+        eq(true, java.nio.file.Files.isRegularFile(javaExe), "probe: running java exists");
+        int major = GameLauncher.probeJavaMajor(javaExe);
+        eq(true, major >= 8, "probe: java -version parsed (got " + major + ")");
+        // end-to-end: detection must find A java on this machine
+        GameLauncher.clearCache();
+        GameLauncher.JavaRuntime found = GameLauncher.findJava();
+        eq(true, found != null, "findJava: detects java on this machine");
+        eq(true, found != null && found.major() >= 8, "findJava: detected java is >= 8");
     }
 
     private static void newsTests() {
@@ -1036,7 +1052,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.8", GameLauncher.LAUNCHER_VERSION, "version is 0.3.8");
+        eq("0.3.9", GameLauncher.LAUNCHER_VERSION, "version is 0.3.9");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");

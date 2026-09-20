@@ -93,6 +93,14 @@ Publish-wiki automation, crash hardening, performance, and a redesigned logo.
 - **New logo:** grass block on a rounded gradient badge with green glow and rim light (window icon, nav rail, title bar, play page, settings, all exported icons); `--export-icon` now also emits a resolution-independent **`OmniLauncher.svg`** mirroring the badge
 - Selftest 181 → 183. Version 0.3.6
 
+## v0.3.9 — 2026-09-20
+
+Fixes: Java detection on Windows and data-folder creation.
+
+- **Fix: "no Java runtime found" with Java installed** — `java -version` prints to **stderr**, but the version probe read only stdout, so every installed Java parsed as "unknown" and was rejected. The probe now merges both streams; verified end-to-end in the selftest by probing the actual running JVM (regression would fail instantly). Users with Adoptium/Oracle/any PATH Java are detected again
+- **`~/.omnilauncher` (and `logs/`) is created eagerly on every run**, before anything writes — no more missing-folder states on first launch
+- Selftest 210 → 214. Version 0.3.9
+
 ## v0.3.8 — 2026-09-20
 
 `~/.omnilauncher`, instances, and full diagnostics.

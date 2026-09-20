@@ -19,8 +19,15 @@ import com.omninode.omnilauncher.util.Os;
 /** Entry point: GUI by default, plus headless CLI modes. */
 public class Main {
 
-    /** Logs the session header and migrates legacy data folders (once). */
+    /** Logs the session header, ensures the data folder exists, and migrates
+     *  legacy data folders (once). */
     private static void startupDiagnostics(String[] args) {
+        try {
+            java.nio.file.Files.createDirectories(Os.dataDir());
+            java.nio.file.Files.createDirectories(Os.logsDir());
+        } catch (Exception e) {
+            Log.warn("Could not create data/logs folders: " + e.getMessage());
+        }
         Log.info("OmniLauncher " + GameLauncher.LAUNCHER_VERSION + " starting"
                 + " — os=" + Os.get().family + "/" + Os.get().arch
                 + " java=" + System.getProperty("java.version")
