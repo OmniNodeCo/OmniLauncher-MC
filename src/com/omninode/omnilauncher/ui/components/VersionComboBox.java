@@ -41,8 +41,17 @@ public class VersionComboBox extends javax.swing.JComponent {
         popup.setLayout(new BorderLayout());
         popup.add(popupPanel);
         popup.setFocusable(true);
+        popup.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) { }
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
+                hiddenAt = System.currentTimeMillis();
+            }
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
+                hiddenAt = System.currentTimeMillis();
+            }
+        });
         addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) {
+            @Override public void mouseReleased(MouseEvent e) {
                 if (contains(e.getPoint())) togglePopup();
             }
         });
@@ -62,28 +71,43 @@ public class VersionComboBox extends javax.swing.JComponent {
 
     public VersionManifest.Entry getSelected() { return selected; }
 
-    /** Open when closed, close when open (the press can arrive while the
-     *  popup's grab still considers it visible, in either order — both safe). */
+    /** When the popup last hid itself; clicks right after it must not reopen. */
+    private long hiddenAt = -GRACE_MS;
+
+    private static final long GRACE_MS = 300;
+
+    /**
+     * Open when closed, close when open. Runs on mouse RELEASE: opening on
+     * press makes the following release (over the button, outside the popup)
+     * dismiss the popup instantly. The grace window swallows the click that
+     * just closed the popup so a double-click cannot freeze the picker by
+     * re-showing a visible popup inside the mouse-grab dispatch (the original
+     * EDT wedge).
+     */
     private void togglePopup() {
+        long now = System.currentTimeMillis();
         if (popup.isVisible()) {
             popup.setVisible(false);
-        } else {
+        } else if (shouldOpen(now)) {
             showPopup();
         }
     }
 
+    /** Test hook: would a toggle at {@code now} open the popup? */
+    public boolean shouldOpen(long now) {
+        return !popup.isVisible() && now - hiddenAt >= GRACE_MS;
+    }
+
+    /** Test hook: pretend the popup was hidden at {@code when}. */
+    public void noteHiddenForTest(long when) { hiddenAt = when; }
+
     private void showPopup() {
-        // Re-showing an already-visible JPopupMenu from inside the mouse-grab
-        // dispatch wedges the EDT (the app freezes until killed). Guard + move
-        // the actual show off the input event.
+        // Never show() an already-visible popup — that wedged the EDT.
         if (popup.isVisible()) return;
         popupPanel.refresh();
         popup.setPopupSize(new Dimension(Math.max(380, getWidth()), 380));
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            if (popup.isVisible()) return;
-            popup.show(VersionComboBox.this, 0, getHeight() + 4);
-            popupPanel.focusSearch();
-        });
+        popup.show(this, 0, getHeight() + 4);
+        popupPanel.focusSearch();
     }
 
     /** Test hook: whether the version popup is currently visible. */

@@ -335,6 +335,12 @@ public final class SelfTest {
         eq(b.id(), box.getSelected().id(), "combo: selection propagates");
         panel.refresh();
         eq(1, fired[0], "combo: second refresh still guarded");
+        // grace logic: the click that just closed the popup must not reopen it
+        long now = System.currentTimeMillis();
+        box.noteHiddenForTest(now - 50);
+        eq(false, box.shouldOpen(now), "combo: click right after close is swallowed");
+        box.noteHiddenForTest(now - 1000);
+        eq(true, box.shouldOpen(now), "combo: later click reopens");
     }
 
     private static void newsTests() {
