@@ -43,11 +43,13 @@ public class GameLauncher {
         return buildCommand(v, account, rt, Settings.get().resolveGameDir());
     }
 
-    /** As above, but with an explicit game directory (used by instances). */
+    /** As above, but with an explicit game directory (null = default). */
     public static List<String> buildCommand(VersionInstaller.InstalledVersion v,
                                             Account account, JavaRuntime rt,
                                             java.nio.file.Path gameDir) {
         Settings s = Settings.get();
+        // defensive: a null dir (legacy callers) means the default game dir
+        java.nio.file.Path dir = gameDir != null ? gameDir : s.resolveGameDir();
         Os os = Os.get();
 
         // ------------------------------------------------------ variables
@@ -62,7 +64,7 @@ public class GameLauncher {
         Map<String, String> gameVars = new LinkedHashMap<>(vars);
         gameVars.put("auth_player_name", account.getName());
         gameVars.put("version_name", v.json().id);
-        gameVars.put("game_directory", gameDir.toAbsolutePath().toString());
+        gameVars.put("game_directory", dir.toAbsolutePath().toString());
         gameVars.put("assets_root", Os.assetsDir().toString());
         gameVars.put("assets_index_name",
                 v.json().assetIndex != null ? v.json().assetIndex.id() : "legacy");
@@ -179,10 +181,11 @@ public class GameLauncher {
         return launch(v, account, rt, Settings.get().resolveGameDir(), listener);
     }
 
-    /** As above, but with an explicit game directory (used by instances). */
+    /** As above, but with an explicit game directory (null = default). */
     public static Process launch(VersionInstaller.InstalledVersion v, Account account,
                                  JavaRuntime rt, java.nio.file.Path gameDir,
                                  RunListener listener) throws IOException {
+        if (gameDir == null) gameDir = Settings.get().resolveGameDir();
         if (rt == null) {
             listener.failed("No Java runtime available.");
             return null;

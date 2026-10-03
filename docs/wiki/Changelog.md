@@ -99,7 +99,8 @@ Fixes: Java detection on Windows and data-folder creation.
 
 - **Fix: "no Java runtime found" with Java installed** — `java -version` prints to **stderr**, but the version probe read only stdout, so every installed Java parsed as "unknown" and was rejected. The probe now merges both streams; verified end-to-end in the selftest by probing the actual running JVM (regression would fail instantly). Users with Adoptium/Oracle/any PATH Java are detected again
 - **`~/.omnilauncher` (and `logs/`) is created eagerly on every run**, before anything writes — no more missing-folder states on first launch
-- Selftest 210 → 214. Version 0.3.9
+- **Fix: launch crash** — `Cannot invoke "java.nio.file.Path.toAbsolutePath()" because "<parameter4>" is null`: non-instance play passed a null game directory into the new explicit-dir launch path. Null now falls back to the default game folder (regression-tested; command output identical to the default path)
+- Selftest 210 → 216. Version 0.3.9 (re-cut with the launch fix)
 
 ## v0.3.8 — 2026-09-20
 

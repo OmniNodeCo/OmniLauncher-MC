@@ -773,6 +773,16 @@ public final class SelfTest {
         eq(true, cmd.contains("--width") && cmd.contains("854"), "cmd: resolution feature");
         eq(true, cmd.indexOf("net.minecraft.client.main.Main") > cp, "cmd: main class after jvm args");
 
+        // regression: non-instance play passed gameDir=null into the
+        // explicit-dir overload and NPE'd on toAbsolutePath()
+        var rt17 = new GameLauncher.JavaRuntime(Path.of("/usr/bin/java"), 17);
+        var nullCmd = GameLauncher.buildCommand(v, Account.offline("Steve"), rt17, null);
+        var defCmd = GameLauncher.buildCommand(v, Account.offline("Steve"), rt17,
+                Settings.get().resolveGameDir());
+        eq(defCmd.toString(), nullCmd.toString(), "cmd: null game dir falls back to settings");
+        eq(true, nullCmd.contains(Settings.get().resolveGameDir().toAbsolutePath().toString()),
+                "cmd: default game dir in arguments");
+
         var legacy = VersionJson.parse(LEGACY_VERSION_JSON);
         var lv = new VersionInstaller.InstalledVersion(Path.of("/vl"), Path.of("/vl/c.jar"),
                 List.of(Path.of("/libs/old.jar")), Path.of("/vl/natives"), legacy);

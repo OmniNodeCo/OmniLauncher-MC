@@ -89,7 +89,9 @@ public class LaunchController {
                 // launch
                 st.set(AppState.Phase.LAUNCHING, "Launching Minecraft " + entry.id() + "…");
                 Account acc = account;
-                java.nio.file.Path gameDir = instance != null ? instance.gameDir() : null;
+                java.nio.file.Path gameDir = instance != null
+                        ? instance.gameDir()
+                        : Settings.get().resolveGameDir();
                 GameLauncher.launch(installed, acc, rt, gameDir, new GameLauncher.RunListener() {
                     @Override public void started(Process p) {
                         st.setGameProcess(p, entry.id());
