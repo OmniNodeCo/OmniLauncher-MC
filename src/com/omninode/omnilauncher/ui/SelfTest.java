@@ -1062,7 +1062,7 @@ public final class SelfTest {
     /* ---------------------------------------------------- icons & version */
 
     private static void iconTests() throws Exception {
-        eq("0.3.9", GameLauncher.LAUNCHER_VERSION, "version is 0.3.9");
+        eq("0.3.10", GameLauncher.LAUNCHER_VERSION, "version is 0.3.10");
         Path dir = Files.createTempDirectory("omni-icons");
         var written = com.omninode.omnilauncher.ui.IconExporter.exportAll(dir);
         Path png = dir.resolve("icon-256.png");

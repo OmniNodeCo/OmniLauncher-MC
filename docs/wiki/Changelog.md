@@ -93,6 +93,12 @@ Publish-wiki automation, crash hardening, performance, and a redesigned logo.
 - **New logo:** grass block on a rounded gradient badge with green glow and rim light (window icon, nav rail, title bar, play page, settings, all exported icons); `--export-icon` now also emits a resolution-independent **`OmniLauncher.svg`** mirroring the badge
 - Selftest 181 → 183. Version 0.3.6
 
+## v0.3.10 — 2026-09-20
+
+Housekeeping release: version bump to disambiguate the fixed v0.3.9 re-cut.
+
+- The first v0.3.9 upload briefly shipped with a launch NPE (`Path.toAbsolutePath() … <parameter4> is null`) under the **same filename** as the fixed re-cut, making builds indistinguishable. v0.3.10 is byte-for-byte the fixed code with a new version number — if About shows 0.3.10, you have the fix
+- All `gameDir` paths are null-guarded (null falls back to the default game folder), covered by regression tests (216 passing)
 ## v0.3.9 — 2026-09-20
 
 Fixes: Java detection on Windows and data-folder creation.

@@ -1,4 +1,4 @@
-# OmniLauncher 0.3.9
+# OmniLauncher 0.3.10
 
 A **native, dependency-free Minecraft launcher** with a modern custom GUI —
 written entirely in Java. No Electron, no HTML, no Python, no Node, no
